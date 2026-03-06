@@ -1,0 +1,76 @@
+# Existing content preserved
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.nox/
+.coverage
+.pytest_cache/
+htmlcov/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+*.log
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.spyderproject
+.spyproject
+.rope_project
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Mintlify build output
+.mintlify/
+
+# Runtime solver files
+tmp/
+
+# Platform-specific solver binary
+testnet/dynexcore
+
+# Test cache
+.cache/
+
+# IDE/editor config
+.cursorrules

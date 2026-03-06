@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dynex"
+dynamic = ["version"]
+description = "Dynex Neuromorphic Quantum Computing SDK"
+authors = [
+    { name = "Dynex Developers", email = "support@dynexcoin.org" }
+]
+urls = { Homepage = "https://dynexcoin.org", Documentation = "https://docs.dynexcoin.org", Repository = "https://github.com/tapok1999/dynex-sdk" }
+keywords = ["neuromorphic", "quantum", "sdk", "dynex", "computing"]
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+requires-python = ">=3.11"
+
+dependencies = [
+    "requests>=2.25",
+    "numpy>=2.0",
+    "dimod>=0.10.17",
+    "pyqubo>=1.2.0",
+    "tabulate>=0.8",
+    "pycryptodome>=3.18",
+    "pennylane>=0.44",
+    "ipython>=8.0",
+    "pydantic>=2.11.7",
+    "grpcio>=1.62",
+    "protobuf>=6.31.1",
+    "zstandard>=0.22",
+    "python-dotenv>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "flake8",
+    "black",
+    "isort",
+    "pre-commit",
+    "ipykernel",
+    "matplotlib",
+    "scipy",
+    "pandas",
+    "plotly",
+    "pyqubo>=1.2.0",
+]
+
+[tool.setuptools]
+packages = ["dynex", "dynex.interfaces", "dynex.models"]
+
+[tool.setuptools_scm]
+local_scheme = "no-local-version"
+
+[tool.uv]
+package = true
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    # Directories
+    \.git
+  | \.venv
+  | venv
+  | build
+  | dist
+  | \.egg-info
+  | __pycache__
+  | \.pytest_cache
+  | proto
+  | examples
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+skip_gitignore = true
+extend_skip = ["proto", "examples"]
