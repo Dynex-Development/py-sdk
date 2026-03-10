@@ -9,7 +9,7 @@ description = "Dynex Neuromorphic Quantum Computing SDK"
 authors = [
     { name = "Dynex Developers", email = "support@dynexcoin.org" }
 ]
-urls = { Homepage = "https://dynexcoin.org", Documentation = "https://docs.dynexcoin.org", Repository = "https://github.com/tapok1999/dynex-sdk" }
+urls = { Homepage = "https://dynexcoin.org", Documentation = "https://docs.dynexcoin.org", Repository = "https://github.com/Dynex-Development/py-sdk" }
 keywords = ["neuromorphic", "quantum", "sdk", "dynex", "computing"]
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -49,7 +49,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["dynex", "dynex.interfaces", "dynex.models"]
+packages = ["dynex", "dynex.interfaces", "dynex.models", "dynex.proto"]
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"

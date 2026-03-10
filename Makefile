@@ -1,5 +1,5 @@
 .PHONY: help install sync test test-unit test-integration \
-        format check lint pre-commit-check build clean lock
+        format check lint pre-commit-check build publish clean lock
 
 UV      := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
 VENV    = .venv
@@ -30,8 +30,10 @@ help:
 	@echo "  make lint              Run flake8 linter"
 	@echo "  make pre-commit-check  Run all pre-commit hooks"
 	@echo ""
-	@echo "Build:"
+	@echo "Build & Publish:"
 	@echo "  make build             Build wheel and sdist"
+	@echo "  make publish           Build and upload to PyPI (requires PYPI_TOKEN)"
+	@echo "  make publish-test      Build and upload to TestPyPI"
 	@echo "  make clean             Remove build artifacts and venv"
 
 # ─── Setup ───────────────────────────────────────────────────────────────────
@@ -101,6 +103,12 @@ pre-commit-check:
 
 build:
 	$(UV) build
+
+publish: build
+	$(UV) publish
+
+publish-test: build
+	$(UV) publish --publish-url https://test.pypi.org/legacy/
 
 # ─── Clean ───────────────────────────────────────────────────────────────────
 
