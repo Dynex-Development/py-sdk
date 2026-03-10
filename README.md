@@ -2,6 +2,11 @@
 
 Dynex provides a qubit-agnostic computing platform designed to unify diverse quantum and quantum-driven compute resources under a single execution and programming environment. The Dynex SDK enables users to access heterogeneous compute modalities through a consistent workflow for optimization, simulation, and probabilistic workloads—without requiring direct exposure to device-specific implementations. It is compatible with PennyLane, IBM Qiskit, OpenQAM, Dimod, PyQUBO, and the Ocean SDK.
 
+## Documentation & Examples
+
+- [Dynex SDK Documentation & API Reference](https://dynex.mintlify.app/introduction)
+- [A curated collection of Dynex SDK based example notebooks](https://github.com/Dynex-Development/awesome-dynex)
+
 ## Installation
 
 ```bash
