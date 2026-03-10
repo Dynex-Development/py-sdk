@@ -1,10 +1,8 @@
 # Dynex SDK
 
-Python SDK for quantum computing on Dynex platform. Compatible with Dimod, PyQUBO, and Ocean SDK.
+Dynex provides a qubit-agnostic computing platform designed to unify diverse quantum and quantum-driven compute resources under a single execution and programming environment. The Dynex SDK enables users to access heterogeneous compute modalities through a consistent workflow for optimization, simulation, and probabilistic workloads—without requiring direct exposure to device-specific implementations. It is compatible with PennyLane, IBM Qiskit, OpenQAM, Dimod, PyQUBO, and the Ocean SDK.
 
 ## Installation
-
-### With uv
 
 ```bash
 uv add dynex
@@ -66,7 +64,7 @@ config = DynexConfig(compute_backend="qpu")
 
 #### 1. CPU Backend (Default)
 
-Local CPU simulation for testing and development:
+Efficient quantum emulation on CPU providing up to 1,000,000 algorithmic qubits:
 
 ```python
 config = DynexConfig(compute_backend=ComputeBackend.CPU)
@@ -76,7 +74,7 @@ sampleset = sampler.sample(num_reads=100)
 
 #### 2. GPU Backend
 
-GPU-accelerated simulation:
+GPU-accelerated quantum emulation of up to 1,000,000 algorithmic qubits:
 
 ```python
 config = DynexConfig(compute_backend=ComputeBackend.GPU)
