@@ -6,43 +6,100 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  build:
-    name: Build
+  verify-main:
+    name: Verify tag is on main
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - run: |
+          git fetch origin main --depth=1
+          TAG_COMMIT="$(git rev-list -n 1 "$GITHUB_REF")"
+          git merge-base --is-ancestor "$TAG_COMMIT" origin/main
+
+  verify-tag-format:
+    name: Verify tag format
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: |
+          if ! echo "$GITHUB_REF_NAME" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Tag '$GITHUB_REF_NAME' does not match vX.Y.Z"
+            exit 1
+          fi
+
+  build:
+    name: Build
+    needs: [verify-main, verify-tag-format]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.11'
 
       - name: Install build tools
-        run: pip install build
+        run: pip install build twine
 
       - name: Build wheel and sdist
         run: python -m build
 
-      - uses: actions/upload-artifact@v4
+      - name: Validate package metadata
+        run: twine check dist/*
+
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f  # v7
         with:
           name: dist
           path: dist/
+
+  run-tests:
+    name: Unit Tests
+    needs: [verify-main, verify-tag-format]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest python-dotenv
+
+      - name: Run unit tests
+        env:
+          DYNEX_SDK_KEY: ${{ secrets.DYNEX_SDK_KEY }}
+        run: |
+          source .venv/bin/activate
+          pytest tests/unit/ -v
 
   publish:
     name: Publish
-    needs: build
+    needs: [build, run-tests]
     runs-on: ubuntu-latest
     environment: pypi
+    permissions:
+      id-token: write
 
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3  # v7
         with:
           name: dist
           path: dist/
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e  # v1.13.0
