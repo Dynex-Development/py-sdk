@@ -4,16 +4,10 @@ Python SDK for quantum computing on Dynex platform. Compatible with Dimod, PyQUB
 
 ## Installation
 
-### With uv (recommended)
+### With uv
 
 ```bash
 uv add dynex
-```
-
-### With pip
-
-```bash
-pip install dynex
 ```
 
 ### Install uv
@@ -92,7 +86,7 @@ sampleset = sampler.sample(num_reads=100)
 
 #### 3. QPU Backend
 
-Real quantum hardware via Dynex Neuromorphic Platform:
+Access to Quantum Processing Units (QPUs), including Dynex's proprietary quantum hardware (Apollo and Zeus series) and integrated third-party QPUs (IBM, IonQ, Rigetti, D-Wave, QuEra and IQM) via Dynex's Qubit-Agnostic Quantum Platform:
 
 ```python
 from dynex import QPUModel
@@ -100,13 +94,13 @@ from dynex import QPUModel
 # Using QPUModel enum (recommended)
 config = DynexConfig(
     compute_backend=ComputeBackend.QPU,
-    qpu_model=QPUModel.APOLLO_RC1  # or QPUModel.APOLLO_10000
+    qpu_model=QPUModel.APOLLO_RC1  # or other supported QPUs
 )
 
 # Or using string
 config = DynexConfig(
     compute_backend=ComputeBackend.QPU,
-    qpu_model="apollo_rc1"  # or "apollo_10000"
+    qpu_model="apollo_rc1"  # or other supported QPUs
 )
 
 sampler = dynex.DynexSampler(model, config=config)
