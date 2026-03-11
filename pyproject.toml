@@ -54,6 +54,7 @@ packages = ["dynex", "dynex.interfaces", "dynex.models", "dynex.proto"]
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
+fallback_version = "0.0.0"
 
 [tool.uv]
 package = true
