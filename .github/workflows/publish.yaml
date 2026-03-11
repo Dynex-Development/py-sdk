@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
 
       - run: |
-          git fetch origin main --depth=1
+          git fetch origin main
           TAG_COMMIT="$(git rev-list -n 1 "$GITHUB_REF")"
           git merge-base --is-ancestor "$TAG_COMMIT" origin/main
 
