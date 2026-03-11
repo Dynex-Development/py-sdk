@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dynex"
 dynamic = ["version"]
-description = "Dynex Neuromorphic Quantum Computing SDK"
+description = "Dynex SDK"
 authors = [
-    { name = "Dynex Developers", email = "support@dynexcoin.org" }
+    { name = "Dynex", email = "office@dynex.ch" }
 ]
-urls = { Homepage = "https://dynexcoin.org", Documentation = "https://docs.dynexcoin.org", Repository = "https://github.com/Dynex-Development/py-sdk" }
+urls = { Homepage = "https://dynex.co", Documentation = "https://dynex.mintlify.app/introduction", Repository = "https://github.com/Dynex-Development/py-sdk" }
 keywords = ["neuromorphic", "quantum", "sdk", "dynex", "computing"]
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
