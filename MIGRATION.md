@@ -46,14 +46,14 @@ SDK V2 uses environment variables with optional `.env` file support:
 
 ```bash
 DYNEX_SDK_KEY=your_sdk_key
-DYNEX_GRPC_ENDPOINT=127.0.0.1:9090
+DYNEX_GRPC_ENDPOINT=quantum-router-engine-grpc.hz.dynex.co:3000
 ```
 
 **Or set environment variables directly:**
 
 ```bash
 export DYNEX_SDK_KEY=your_sdk_key
-export DYNEX_GRPC_ENDPOINT=127.0.0.1:9090
+export DYNEX_GRPC_ENDPOINT=quantum-router-engine-grpc.hz.dynex.co:3000
 ```
 
 **In code:**
@@ -74,7 +74,7 @@ config = DynexConfig(
 # QPU backend - quantum hardware (network mode)
 config = DynexConfig(
     sdk_key="your_sdk_key",
-    grpc_endpoint="grpc.dynex.com:9090",
+    grpc_endpoint="quantum-router-engine-grpc.hz.dynex.co:3000",
     compute_backend=ComputeBackend.QPU,
     qpu_model=QPUModel.APOLLO_RC1  # Required for QPU (or use string "apollo_rc1")
 )
@@ -318,7 +318,7 @@ The new SDK uses:
 
 **Migration Impact:**
 
-- Firewall rules must allow gRPC traffic (default port 9090)
+- Firewall rules must allow gRPC traffic (port 443)
 - FTP server access no longer required
 - Faster communication and lower latency
 - Binary protocol instead of text-based
@@ -441,7 +441,7 @@ rm dynex.ini
 
 cat > .env << EOF
 DYNEX_SDK_KEY=your_sdk_key
-DYNEX_GRPC_ENDPOINT=127.0.0.1:9090
+DYNEX_GRPC_ENDPOINT=quantum-router-engine-grpc.hz.dynex.co:3000
 EOF
 ```
 
@@ -476,7 +476,7 @@ sampleset = sampler.sample(num_reads=100, annealing_time=500)
 
 - Ensure gRPC endpoint is accessible
 - Test network connectivity to the backend
-- Update firewall rules if needed for gRPC traffic (default port: 9090)
+- Update firewall rules if needed for gRPC traffic (port: 443)
 
 ### Step 5: Test
 
