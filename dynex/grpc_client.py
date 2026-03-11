@@ -136,7 +136,7 @@ class DynexGrpcClient:
             if "://" in grpc_endpoint:
                 parsed = urlparse(grpc_endpoint)
                 host = parsed.hostname or parsed.path
-                port = parsed.port or 9090
+                port = parsed.port or 3000
                 use_tls = parsed.scheme == "https"
             else:
                 # Format is "host:port"
@@ -145,7 +145,7 @@ class DynexGrpcClient:
                     port = int(port_str)
                 else:
                     host = grpc_endpoint
-                    port = 9090
+                    port = 3000
                 # Determine TLS based on host (localhost = no TLS, otherwise TLS)
                 use_tls = host not in ("localhost", "127.0.0.1")
         else:

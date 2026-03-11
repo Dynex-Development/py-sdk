@@ -25,7 +25,7 @@ def sdk_credentials():
     Returns None if not available (allows skipping integration tests).
     """
     sdk_key = os.getenv("DYNEX_SDK_KEY")
-    grpc_endpoint = os.getenv("DYNEX_GRPC_ENDPOINT", "https://quantum-router.dynex.co:8091")
+    grpc_endpoint = os.getenv("DYNEX_GRPC_ENDPOINT", "quantum-router-engine-grpc.hz.dynex.co:3000")
 
     if not sdk_key:
         return None

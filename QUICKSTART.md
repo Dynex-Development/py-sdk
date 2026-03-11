@@ -19,7 +19,7 @@ uv sync
 ```bash
 # .env
 DYNEX_SDK_KEY=your_sdk_key_here
-DYNEX_GRPC_ENDPOINT=grpc.dynex.com:9090
+DYNEX_GRPC_ENDPOINT=quantum-router-engine-grpc.hz.dynex.co:3000
 ```
 
 ## Running examples

@@ -60,6 +60,7 @@ Set credentials via environment variables or `.env` file:
 
 ```bash
 DYNEX_SDK_KEY=your_sdk_key
+DYNEX_GRPC_ENDPOINT=quantum-router-engine-grpc.hz.dynex.co:3000
 ```
 
 ### Compute Backends
