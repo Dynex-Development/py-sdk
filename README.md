@@ -9,8 +9,16 @@ Dynex provides a qubit-agnostic computing platform designed to unify diverse qua
 
 ## Installation
 
+### Install with uv (recommended)
+
 ```bash
 uv add dynex
+```
+
+### Install with pip
+
+```bash
+pip install dynex
 ```
 
 ### Install uv
