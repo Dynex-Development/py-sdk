@@ -204,17 +204,12 @@ class DynexGrpcClient:
 
     def _build_job_options(self, opts: Union["JobOptions", dict]) -> sdk_pb2.JobNewOpts:
         """Translate JobOptions or legacy opts dict into structured JobNewOpts message."""
-        # Handle Pydantic model
         if hasattr(opts, "model_dump"):
             opts_dict = opts.model_dump()
         else:
             opts_dict = opts
 
-        compute_backend_raw = opts_dict.get(
-            "compute_backend",
-            "unspecified",
-        )
-        # Map string values to protobuf enum values
+        compute_backend_raw = opts_dict.get("compute_backend", "unspecified")
         if isinstance(compute_backend_raw, str):
             compute_backend_value = self._COMPUTE_BACKEND_MAPPING.get(
                 compute_backend_raw.lower(), sdk_pb2.COMPUTE_BACKEND_UNSPECIFIED
@@ -229,8 +224,10 @@ class DynexGrpcClient:
         if "use_gpu" in opts_dict:
             self._log_debug("Ignoring deprecated use_gpu option")
 
-        # Build JobNewOpts
-        job_opts = sdk_pb2.JobNewOpts(
+        job_metadata = opts_dict.get("job_metadata")
+        metadata_json = json.dumps(job_metadata) if job_metadata else ""
+
+        return sdk_pb2.JobNewOpts(
             max_steps=int(opts_dict.get("annealing_time", 0)),
             num_reads=int(opts_dict.get("num_reads", 0)),
             min_step_size=float(opts_dict.get("min_step_size", 0.0)),
@@ -242,32 +239,8 @@ class DynexGrpcClient:
             population_size=int(opts_dict.get("population_size", 0)),
             rank=int(opts_dict.get("rank", 0)),
             compute_backend=compute_backend_value,
+            job_metadata_json=metadata_json,
         )
-
-        # Add preprocess to description if needed (protobuf may not have this field yet)
-        preprocess = opts_dict.get("preprocess", False)
-        if preprocess:
-            # Append preprocess flag to description for Modal API to parse
-            current_desc = job_opts.description
-            if current_desc:
-                job_opts.description = f"{current_desc} preprocess=True"
-            else:
-                job_opts.description = "preprocess=True"
-
-        # Add job_metadata to description for Apollo API to distinguish Circuit vs Constraint BQM
-        job_metadata = opts_dict.get("job_metadata")
-        if job_metadata:
-            import json
-
-            # Append job_metadata as JSON to description for Modal API to parse
-            metadata_json = json.dumps(job_metadata)
-            current_desc = job_opts.description
-            if current_desc:
-                job_opts.description = f"{current_desc} job_metadata={metadata_json}"
-            else:
-                job_opts.description = f"job_metadata={metadata_json}"
-
-        return job_opts
 
     def _iter_create_job_requests(
         self, opts: Union["JobOptions", dict], file_zip: str
@@ -302,6 +275,86 @@ class DynexGrpcClient:
                 stub = self._get_stub()
                 response = stub.CreateJob(
                     self._iter_create_job_requests(opts, file_zip),
+                    metadata=self._metadata(),
+                )
+                qasm = json.loads(response.qasm_json) if response.qasm_json else None
+                self._log_success(f"Job created successfully (job_id={response.job_id})")
+                return JobCreationResult(
+                    job_id=response.job_id,
+                    filename=job_filename,
+                    price_per_block=response.real_price_per_block,
+                    qasm=qasm,
+                )
+            except grpc.RpcError as e:
+                last_exception = e
+                self._log_error(f"gRPC request failed: {e}")
+                if try_count > 1:
+                    self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
+                else:
+                    raise RuntimeError(f"gRPC job creation failed: {e}") from e
+            except Exception as e:
+                last_exception = e
+                self._log_error(f"Unexpected error: {e}")
+                if try_count > 1:
+                    self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
+                else:
+                    raise RuntimeError(f"Job creation failed: {e}") from e
+
+        raise RuntimeError(
+            f"Job creation failed after {retry_count} attempts: {str(last_exception)}"
+        ) from last_exception
+
+    def _iter_create_job_from_data_requests(
+        self,
+        opts: Union["JobOptions", dict],
+        rows: list,
+        cols: list,
+        vals: list,
+        offset: float,
+        num_vars: int,
+        filename: str,
+    ) -> Iterable[sdk_pb2.CreateJobRequest]:
+        if hasattr(opts, "model_dump"):
+            request_ip = opts.request_ip
+        else:
+            request_ip = opts.get("request_ip", "") if isinstance(opts, dict) else ""
+
+        init_payload = sdk_pb2.CreateJobInit(
+            opts=self._build_job_options(opts),
+            request_ip=str(request_ip),
+        )
+        yield sdk_pb2.CreateJobRequest(init=init_payload)
+
+        job_data_msg = sdk_pb2.JobData(
+            num_vars=int(num_vars),
+            row=rows,
+            col=cols,
+            val=vals,
+            offset=float(offset),
+            filename=filename,
+        )
+        yield sdk_pb2.CreateJobRequest(job_data=job_data_msg)
+
+    def create_job_from_data(
+        self,
+        opts: Union["JobOptions", dict],
+        rows: list,
+        cols: list,
+        vals: list,
+        offset: float,
+        num_vars: int,
+        job_filename: str,
+        retry_count: int,
+    ) -> JobCreationResult:
+        last_exception: Optional[Exception] = None
+
+        for try_count in range(retry_count, 0, -1):
+            try:
+                stub = self._get_stub()
+                response = stub.CreateJob(
+                    self._iter_create_job_from_data_requests(
+                        opts, rows, cols, vals, offset, num_vars, job_filename
+                    ),
                     metadata=self._metadata(),
                 )
                 qasm = json.loads(response.qasm_json) if response.qasm_json else None

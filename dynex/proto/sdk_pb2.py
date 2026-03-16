@@ -4,15 +4,18 @@
 # source: pkg/proto/sdk/v2/sdk.proto
 # Protobuf Python Version: 6.31.1
 """Generated protocol buffer code."""
-
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
-
 _runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "pkg/proto/sdk/v2/sdk.proto"
+    _runtime_version.Domain.PUBLIC,
+    6,
+    31,
+    1,
+    '',
+    'pkg/proto/sdk/v2/sdk.proto'
 )
 # @@protoc_insertion_point(imports)
 
@@ -22,84 +25,77 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 from dynex.proto import solution_envelope_pb2 as pkg_dot_proto_dot_sdk_dot_v2_dot_solution__envelope__pb2
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\x1apkg/proto/sdk/v2/sdk.proto\x12\x0c\x64ynex.sdk.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(pkg/proto/sdk/v2/solution_envelope.proto"s\n\x10\x43reateJobRequest\x12+\n\x04init\x18\x01 \x01(\x0b\x32\x1b.dynex.sdk.v2.CreateJobInitH\x00\x12\'\n\x05\x63hunk\x18\x02 \x01(\x0b\x32\x16.dynex.sdk.v2.JobChunkH\x00\x42\t\n\x07payload"K\n\rCreateJobInit\x12&\n\x04opts\x18\x01 \x01(\x0b\x32\x18.dynex.sdk.v2.JobNewOpts\x12\x12\n\nrequest_ip\x18\x02 \x01(\t"\x99\x02\n\nJobNewOpts\x12\x11\n\tmax_steps\x18\x01 \x01(\x05\x12\x11\n\tnum_reads\x18\x03 \x01(\x05\x12\x15\n\rmin_step_size\x18\x05 \x01(\x01\x12\x13\n\x0b\x64\x65scription\x18\x06 \x01(\t\x12\x11\n\tblock_fee\x18\x07 \x01(\x03\x12\x0e\n\x06reward\x18\x08 \x01(\x03\x12\x12\n\nis_cluster\x18\n \x01(\x08\x12\r\n\x05shots\x18\r \x01(\x03\x12\x15\n\rtarget_energy\x18\x0e \x01(\x01\x12\x17\n\x0fpopulation_size\x18\x10 \x01(\x05\x12\x0c\n\x04rank\x18\x13 \x01(\x05\x12\x35\n\x0f\x63ompute_backend\x18\x14 \x01(\x0e\x32\x1c.dynex.sdk.v2.ComputeBackend"\x18\n\x08JobChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c"Q\n\x0e\x43reateJobReply\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x1c\n\x14real_price_per_block\x18\x02 \x01(\x03\x12\x11\n\tqasm_json\x18\x03 \x01(\t"5\n\x12\x45stimateJobRequest\x12\x11\n\topts_json\x18\x01 \x01(\t\x12\x0c\n\x04\x66ile\x18\x02 \x01(\x0c"W\n\x10\x45stimateJobReply\x12\x17\n\x0f\x65stimated_price\x18\x01 \x01(\x03\x12\x18\n\x10price_per_minute\x18\x02 \x01(\x03\x12\x10\n\x08job_type\x18\x03 \x01(\x05""\n\x10\x43\x61ncelJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03"K\n\x0e\x43\x61ncelJobReply\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0f\n\x07min_loc\x18\x02 \x01(\x05\x12\x12\n\nmin_energy\x18\x03 \x01(\x01J\x04\x08\x04\x10\x05"G\n\x10\x46inishJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0f\n\x07min_loc\x18\x02 \x01(\x05\x12\x12\n\nmin_energy\x18\x03 \x01(\x01"K\n\x0e\x46inishJobReply\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0f\n\x07min_loc\x18\x02 \x01(\x05\x12\x12\n\nmin_energy\x18\x03 \x01(\x01J\x04\x08\x04\x10\x05""\n\x10UpdateJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03"K\n\x0eUpdateJobReply\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0f\n\x07min_loc\x18\x02 \x01(\x05\x12\x12\n\nmin_energy\x18\x03 \x01(\x01J\x04\x08\x04\x10\x05"7\n\x13SubscribeJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x10\n\x08\x66rom_seq\x18\x02 \x01(\x04"\x91\x03\n\x08JobEvent\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12&\n\x02ts\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12)\n\x04type\x18\x04 \x01(\x0e\x32\x1b.dynex.sdk.v2.JobEvent.Type\x12)\n\x06status\x18\n \x01(\x0b\x32\x17.dynex.sdk.v2.JobStatusH\x00\x12*\n\x08progress\x18\x0b \x01(\x0b\x32\x16.dynex.sdk.v2.ProgressH\x00\x12+\n\x08\x65nvelope\x18\r \x01(\x0b\x32\x17.proto.SolutionEnvelopeH\x00\x12(\n\x05\x65rror\x18\x0e \x01(\x0b\x32\x17.dynex.sdk.v2.ErrorInfoH\x00"V\n\x04Type\x12\x0e\n\nJOB_STATUS\x10\x00\x12\x0c\n\x08PROGRESS\x10\x01\x12\x10\n\x0cSOLUTION_NEW\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x12\r\n\tHEARTBEAT\x10\x05"\x04\x08\x02\x10\x02\x42\t\n\x07payloadJ\x04\x08\x0c\x10\r"*\n\tJobStatus\x12\r\n\x05state\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t"1\n\x08Progress\x12\x0f\n\x07percent\x18\x01 \x01(\x01\x12\x14\n\x0c\x61tomics_json\x18\x02 \x01(\t"*\n\tErrorInfo\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t"&\n\x14ListSolutionsRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03"\xa7\x01\n\x0cSolutionMeta\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04size\x18\x02 \x01(\x03\x12\x10\n\x08\x63hecksum\x18\x03 \x01(\t\x12\r\n\x05valid\x18\x04 \x01(\x08\x12\x0c\n\x04kind\x18\x05 \x01(\t\x12\x0b\n\x03url\x18\x06 \x01(\t\x12\x0f\n\x07subject\x18\x07 \x01(\t\x12.\n\narrived_ts\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"?\n\x12ListSolutionsReply\x12)\n\x05items\x18\x01 \x03(\x0b\x32\x1a.dynex.sdk.v2.SolutionMeta"7\n\x17\x44ownloadSolutionRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0c\n\x04name\x18\x02 \x01(\t"\x1d\n\rSolutionChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c"5\n\x15GetSolutionURLRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0c\n\x04name\x18\x02 \x01(\t"7\n\x13GetSolutionURLReply\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x13\n\x0bttl_seconds\x18\x02 \x01(\x03"3\n\x12ListAtomicsRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\r\n\x05limit\x18\x02 \x01(\r"=\n\x10ListAtomicsReply\x12)\n\x05items\x18\x01 \x03(\x0b\x32\x1a.dynex.sdk.v2.AtomicForJob"\xae\x02\n\x0c\x41tomicForJob\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\r\n\x05\x63hips\x18\x02 \x01(\x05\x12\x11\n\tmax_steps\x18\x03 \x01(\x04\x12\x0b\n\x03loc\x18\x04 \x01(\x05\x12\x0e\n\x06\x65nergy\x18\x05 \x01(\x01\x12\x0f\n\x07version\x18\x06 \x01(\t\x12.\n\nupdated_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x31\n\rlast_reset_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x10\n\x08hashrate\x18\t \x01(\x01\x12\x15\n\rpool_hashrate\x18\n \x01(\x01\x12\x0e\n\x06status\x18\x0b \x01(\x05\x12\x13\n\x0btotal_steps\x18\x0c \x01(\x03\x12\n\n\x02ip\x18\r \x01(\t*\x8e\x01\n\x0e\x43omputeBackend\x12\x1f\n\x1b\x43OMPUTE_BACKEND_UNSPECIFIED\x10\x00\x12\x1d\n\x19\x43OMPUTE_BACKEND_DYNEX_CPU\x10\x01\x12\x1d\n\x19\x43OMPUTE_BACKEND_DYNEX_GPU\x10\x02\x12\x1d\n\x19\x43OMPUTE_BACKEND_DYNEX_QPU\x10\x03\x32\xf9\x04\n\x03SDK\x12K\n\tCreateJob\x12\x1e.dynex.sdk.v2.CreateJobRequest\x1a\x1c.dynex.sdk.v2.CreateJobReply(\x01\x12O\n\x0b\x45stimateJob\x12 .dynex.sdk.v2.EstimateJobRequest\x1a\x1e.dynex.sdk.v2.EstimateJobReply\x12I\n\tCancelJob\x12\x1e.dynex.sdk.v2.CancelJobRequest\x1a\x1c.dynex.sdk.v2.CancelJobReply\x12I\n\tFinishJob\x12\x1e.dynex.sdk.v2.FinishJobRequest\x1a\x1c.dynex.sdk.v2.FinishJobReply\x12I\n\tUpdateJob\x12\x1e.dynex.sdk.v2.UpdateJobRequest\x1a\x1c.dynex.sdk.v2.UpdateJobReply\x12K\n\x0cSubscribeJob\x12!.dynex.sdk.v2.SubscribeJobRequest\x1a\x16.dynex.sdk.v2.JobEvent0\x01\x12U\n\rListSolutions\x12".dynex.sdk.v2.ListSolutionsRequest\x1a .dynex.sdk.v2.ListSolutionsReply\x12O\n\x0bListAtomics\x12 .dynex.sdk.v2.ListAtomicsRequest\x1a\x1e.dynex.sdk.v2.ListAtomicsReplyBSZQgithub.com/Dynex-Development/QuantumRouterEngine/pkg/proto/gen/dynex/sdk/v2;sdkv2b\x06proto3'
-)
+
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1apkg/proto/sdk/v2/sdk.proto\x12\x0c\x64ynex.sdk.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(pkg/proto/sdk/v2/solution_envelope.proto\"\x9e\x01\n\x10\x43reateJobRequest\x12+\n\x04init\x18\x01 \x01(\x0b\x32\x1b.dynex.sdk.v2.CreateJobInitH\x00\x12\'\n\x05\x63hunk\x18\x02 \x01(\x0b\x32\x16.dynex.sdk.v2.JobChunkH\x00\x12)\n\x08job_data\x18\x03 \x01(\x0b\x32\x15.dynex.sdk.v2.JobDataH\x00\x42\t\n\x07payload\"K\n\rCreateJobInit\x12&\n\x04opts\x18\x01 \x01(\x0b\x32\x18.dynex.sdk.v2.JobNewOpts\x12\x12\n\nrequest_ip\x18\x02 \x01(\t\"\xc8\x02\n\nJobNewOpts\x12\x11\n\tmax_steps\x18\x01 \x01(\x05\x12\x11\n\tnum_reads\x18\x03 \x01(\x05\x12\x15\n\rmin_step_size\x18\x05 \x01(\x01\x12\x13\n\x0b\x64\x65scription\x18\x06 \x01(\t\x12\x11\n\tblock_fee\x18\x07 \x01(\x03\x12\x0e\n\x06reward\x18\x08 \x01(\x03\x12\x12\n\nis_cluster\x18\n \x01(\x08\x12\r\n\x05shots\x18\r \x01(\x03\x12\x15\n\rtarget_energy\x18\x0e \x01(\x01\x12\x17\n\x0fpopulation_size\x18\x10 \x01(\x05\x12\x0c\n\x04rank\x18\x13 \x01(\x05\x12\x35\n\x0f\x63ompute_backend\x18\x14 \x01(\x0e\x32\x1c.dynex.sdk.v2.ComputeBackend\x12\x19\n\x11job_metadata_json\x18\x15 \x01(\t\x12\x12\n\npreprocess\x18\x16 \x01(\x08\"p\n\x07JobData\x12\x10\n\x08num_vars\x18\x01 \x01(\r\x12\x0f\n\x03row\x18\x02 \x03(\x05\x42\x02\x10\x01\x12\x0f\n\x03\x63ol\x18\x03 \x03(\x05\x42\x02\x10\x01\x12\x0f\n\x03val\x18\x04 \x03(\x02\x42\x02\x10\x01\x12\x0e\n\x06offset\x18\x05 \x01(\x02\x12\x10\n\x08\x66ilename\x18\x06 \x01(\t\"\x18\n\x08JobChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\"Q\n\x0e\x43reateJobReply\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x1c\n\x14real_price_per_block\x18\x02 \x01(\x03\x12\x11\n\tqasm_json\x18\x03 \x01(\t\"5\n\x12\x45stimateJobRequest\x12\x11\n\topts_json\x18\x01 \x01(\t\x12\x0c\n\x04\x66ile\x18\x02 \x01(\x0c\"W\n\x10\x45stimateJobReply\x12\x17\n\x0f\x65stimated_price\x18\x01 \x01(\x03\x12\x18\n\x10price_per_minute\x18\x02 \x01(\x03\x12\x10\n\x08job_type\x18\x03 \x01(\x05\"\"\n\x10\x43\x61ncelJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\"K\n\x0e\x43\x61ncelJobReply\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0f\n\x07min_loc\x18\x02 \x01(\x05\x12\x12\n\nmin_energy\x18\x03 \x01(\x01J\x04\x08\x04\x10\x05\"G\n\x10\x46inishJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0f\n\x07min_loc\x18\x02 \x01(\x05\x12\x12\n\nmin_energy\x18\x03 \x01(\x01\"K\n\x0e\x46inishJobReply\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0f\n\x07min_loc\x18\x02 \x01(\x05\x12\x12\n\nmin_energy\x18\x03 \x01(\x01J\x04\x08\x04\x10\x05\"\"\n\x10UpdateJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\"K\n\x0eUpdateJobReply\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0f\n\x07min_loc\x18\x02 \x01(\x05\x12\x12\n\nmin_energy\x18\x03 \x01(\x01J\x04\x08\x04\x10\x05\"7\n\x13SubscribeJobRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x10\n\x08\x66rom_seq\x18\x02 \x01(\x04\"\x91\x03\n\x08JobEvent\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0b\n\x03seq\x18\x02 \x01(\x04\x12&\n\x02ts\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12)\n\x04type\x18\x04 \x01(\x0e\x32\x1b.dynex.sdk.v2.JobEvent.Type\x12)\n\x06status\x18\n \x01(\x0b\x32\x17.dynex.sdk.v2.JobStatusH\x00\x12*\n\x08progress\x18\x0b \x01(\x0b\x32\x16.dynex.sdk.v2.ProgressH\x00\x12+\n\x08\x65nvelope\x18\r \x01(\x0b\x32\x17.proto.SolutionEnvelopeH\x00\x12(\n\x05\x65rror\x18\x0e \x01(\x0b\x32\x17.dynex.sdk.v2.ErrorInfoH\x00\"V\n\x04Type\x12\x0e\n\nJOB_STATUS\x10\x00\x12\x0c\n\x08PROGRESS\x10\x01\x12\x10\n\x0cSOLUTION_NEW\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x12\r\n\tHEARTBEAT\x10\x05\"\x04\x08\x02\x10\x02\x42\t\n\x07payloadJ\x04\x08\x0c\x10\r\"*\n\tJobStatus\x12\r\n\x05state\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t\"1\n\x08Progress\x12\x0f\n\x07percent\x18\x01 \x01(\x01\x12\x14\n\x0c\x61tomics_json\x18\x02 \x01(\t\"*\n\tErrorInfo\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\"7\n\x17\x44ownloadSolutionRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0c\n\x04name\x18\x02 \x01(\t\"\x1d\n\rSolutionChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\"5\n\x15GetSolutionURLRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0c\n\x04name\x18\x02 \x01(\t\"7\n\x13GetSolutionURLReply\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x13\n\x0bttl_seconds\x18\x02 \x01(\x03\"3\n\x12ListAtomicsRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\r\n\x05limit\x18\x02 \x01(\r\"=\n\x10ListAtomicsReply\x12)\n\x05items\x18\x01 \x03(\x0b\x32\x1a.dynex.sdk.v2.AtomicForJob\"\xae\x02\n\x0c\x41tomicForJob\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\r\n\x05\x63hips\x18\x02 \x01(\x05\x12\x11\n\tmax_steps\x18\x03 \x01(\x04\x12\x0b\n\x03loc\x18\x04 \x01(\x05\x12\x0e\n\x06\x65nergy\x18\x05 \x01(\x01\x12\x0f\n\x07version\x18\x06 \x01(\t\x12.\n\nupdated_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x31\n\rlast_reset_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x10\n\x08hashrate\x18\t \x01(\x01\x12\x15\n\rpool_hashrate\x18\n \x01(\x01\x12\x0e\n\x06status\x18\x0b \x01(\x05\x12\x13\n\x0btotal_steps\x18\x0c \x01(\x03\x12\n\n\x02ip\x18\r \x01(\t*\x95\x01\n\x0e\x43omputeBackend\x12\x1f\n\x1b\x43OMPUTE_BACKEND_UNSPECIFIED\x10\x00\x12\x1d\n\x19\x43OMPUTE_BACKEND_DYNEX_CPU\x10\x01\x12\x1d\n\x19\x43OMPUTE_BACKEND_DYNEX_GPU\x10\x02\x12$\n COMPUTE_BACKEND_DYNEX_QPU_APOLLO\x10\x03\x32\xfc\x04\n\x03SDK\x12K\n\tCreateJob\x12\x1e.dynex.sdk.v2.CreateJobRequest\x1a\x1c.dynex.sdk.v2.CreateJobReply(\x01\x12O\n\x0b\x45stimateJob\x12 .dynex.sdk.v2.EstimateJobRequest\x1a\x1e.dynex.sdk.v2.EstimateJobReply\x12I\n\tCancelJob\x12\x1e.dynex.sdk.v2.CancelJobRequest\x1a\x1c.dynex.sdk.v2.CancelJobReply\x12I\n\tFinishJob\x12\x1e.dynex.sdk.v2.FinishJobRequest\x1a\x1c.dynex.sdk.v2.FinishJobReply\x12I\n\tUpdateJob\x12\x1e.dynex.sdk.v2.UpdateJobRequest\x1a\x1c.dynex.sdk.v2.UpdateJobReply\x12K\n\x0cSubscribeJob\x12!.dynex.sdk.v2.SubscribeJobRequest\x1a\x16.dynex.sdk.v2.JobEvent0\x01\x12X\n\x10\x44ownloadSolution\x12%.dynex.sdk.v2.DownloadSolutionRequest\x1a\x1b.dynex.sdk.v2.SolutionChunk0\x01\x12O\n\x0bListAtomics\x12 .dynex.sdk.v2.ListAtomicsRequest\x1a\x1e.dynex.sdk.v2.ListAtomicsReplyBSZQgithub.com/Dynex-Development/QuantumRouterEngine/pkg/proto/gen/dynex/sdk/v2;sdkv2b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "pkg.proto.sdk.v2.sdk_pb2", _globals)
-
-# Manually added: COMPUTE_BACKEND_DYNEX_QPU_APOLLO (value 3)
-# This replaces the old COMPUTE_BACKEND_DYNEX_QPU on the backend
-# TODO: This should be added to the original .proto file (pkg/proto/sdk/v2/sdk.proto) and regenerated properly
-COMPUTE_BACKEND_DYNEX_QPU_APOLLO = 3
-
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'pkg.proto.sdk.v2.sdk_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
-    _globals["DESCRIPTOR"]._loaded_options = None
-    _globals["DESCRIPTOR"]._serialized_options = (
-        b"ZQgithub.com/Dynex-Development/QuantumRouterEngine/pkg/proto/gen/dynex/sdk/v2;sdkv2"
-    )
-    _globals["_COMPUTEBACKEND"]._serialized_start = 2723
-    _globals["_COMPUTEBACKEND"]._serialized_end = 2865
-    _globals["_CREATEJOBREQUEST"]._serialized_start = 119
-    _globals["_CREATEJOBREQUEST"]._serialized_end = 234
-    _globals["_CREATEJOBINIT"]._serialized_start = 236
-    _globals["_CREATEJOBINIT"]._serialized_end = 311
-    _globals["_JOBNEWOPTS"]._serialized_start = 314
-    _globals["_JOBNEWOPTS"]._serialized_end = 595
-    _globals["_JOBCHUNK"]._serialized_start = 597
-    _globals["_JOBCHUNK"]._serialized_end = 621
-    _globals["_CREATEJOBREPLY"]._serialized_start = 623
-    _globals["_CREATEJOBREPLY"]._serialized_end = 704
-    _globals["_ESTIMATEJOBREQUEST"]._serialized_start = 706
-    _globals["_ESTIMATEJOBREQUEST"]._serialized_end = 759
-    _globals["_ESTIMATEJOBREPLY"]._serialized_start = 761
-    _globals["_ESTIMATEJOBREPLY"]._serialized_end = 848
-    _globals["_CANCELJOBREQUEST"]._serialized_start = 850
-    _globals["_CANCELJOBREQUEST"]._serialized_end = 884
-    _globals["_CANCELJOBREPLY"]._serialized_start = 886
-    _globals["_CANCELJOBREPLY"]._serialized_end = 961
-    _globals["_FINISHJOBREQUEST"]._serialized_start = 963
-    _globals["_FINISHJOBREQUEST"]._serialized_end = 1034
-    _globals["_FINISHJOBREPLY"]._serialized_start = 1036
-    _globals["_FINISHJOBREPLY"]._serialized_end = 1111
-    _globals["_UPDATEJOBREQUEST"]._serialized_start = 1113
-    _globals["_UPDATEJOBREQUEST"]._serialized_end = 1147
-    _globals["_UPDATEJOBREPLY"]._serialized_start = 1149
-    _globals["_UPDATEJOBREPLY"]._serialized_end = 1224
-    _globals["_SUBSCRIBEJOBREQUEST"]._serialized_start = 1226
-    _globals["_SUBSCRIBEJOBREQUEST"]._serialized_end = 1281
-    _globals["_JOBEVENT"]._serialized_start = 1284
-    _globals["_JOBEVENT"]._serialized_end = 1685
-    _globals["_JOBEVENT_TYPE"]._serialized_start = 1582
-    _globals["_JOBEVENT_TYPE"]._serialized_end = 1668
-    _globals["_JOBSTATUS"]._serialized_start = 1687
-    _globals["_JOBSTATUS"]._serialized_end = 1729
-    _globals["_PROGRESS"]._serialized_start = 1731
-    _globals["_PROGRESS"]._serialized_end = 1780
-    _globals["_ERRORINFO"]._serialized_start = 1782
-    _globals["_ERRORINFO"]._serialized_end = 1824
-    _globals["_LISTSOLUTIONSREQUEST"]._serialized_start = 1826
-    _globals["_LISTSOLUTIONSREQUEST"]._serialized_end = 1864
-    _globals["_SOLUTIONMETA"]._serialized_start = 1867
-    _globals["_SOLUTIONMETA"]._serialized_end = 2034
-    _globals["_LISTSOLUTIONSREPLY"]._serialized_start = 2036
-    _globals["_LISTSOLUTIONSREPLY"]._serialized_end = 2099
-    _globals["_DOWNLOADSOLUTIONREQUEST"]._serialized_start = 2101
-    _globals["_DOWNLOADSOLUTIONREQUEST"]._serialized_end = 2156
-    _globals["_SOLUTIONCHUNK"]._serialized_start = 2158
-    _globals["_SOLUTIONCHUNK"]._serialized_end = 2187
-    _globals["_GETSOLUTIONURLREQUEST"]._serialized_start = 2189
-    _globals["_GETSOLUTIONURLREQUEST"]._serialized_end = 2242
-    _globals["_GETSOLUTIONURLREPLY"]._serialized_start = 2244
-    _globals["_GETSOLUTIONURLREPLY"]._serialized_end = 2299
-    _globals["_LISTATOMICSREQUEST"]._serialized_start = 2301
-    _globals["_LISTATOMICSREQUEST"]._serialized_end = 2352
-    _globals["_LISTATOMICSREPLY"]._serialized_start = 2354
-    _globals["_LISTATOMICSREPLY"]._serialized_end = 2415
-    _globals["_ATOMICFORJOB"]._serialized_start = 2418
-    _globals["_ATOMICFORJOB"]._serialized_end = 2720
-    _globals["_SDK"]._serialized_start = 2868
-    _globals["_SDK"]._serialized_end = 3501
+  _globals['DESCRIPTOR']._loaded_options = None
+  _globals['DESCRIPTOR']._serialized_options = b'ZQgithub.com/Dynex-Development/QuantumRouterEngine/pkg/proto/gen/dynex/sdk/v2;sdkv2'
+  _globals['_JOBDATA'].fields_by_name['row']._loaded_options = None
+  _globals['_JOBDATA'].fields_by_name['row']._serialized_options = b'\020\001'
+  _globals['_JOBDATA'].fields_by_name['col']._loaded_options = None
+  _globals['_JOBDATA'].fields_by_name['col']._serialized_options = b'\020\001'
+  _globals['_JOBDATA'].fields_by_name['val']._loaded_options = None
+  _globals['_JOBDATA'].fields_by_name['val']._serialized_options = b'\020\001'
+  _globals['_COMPUTEBACKEND']._serialized_start=2653
+  _globals['_COMPUTEBACKEND']._serialized_end=2802
+  _globals['_CREATEJOBREQUEST']._serialized_start=120
+  _globals['_CREATEJOBREQUEST']._serialized_end=278
+  _globals['_CREATEJOBINIT']._serialized_start=280
+  _globals['_CREATEJOBINIT']._serialized_end=355
+  _globals['_JOBNEWOPTS']._serialized_start=358
+  _globals['_JOBNEWOPTS']._serialized_end=686
+  _globals['_JOBDATA']._serialized_start=688
+  _globals['_JOBDATA']._serialized_end=800
+  _globals['_JOBCHUNK']._serialized_start=802
+  _globals['_JOBCHUNK']._serialized_end=826
+  _globals['_CREATEJOBREPLY']._serialized_start=828
+  _globals['_CREATEJOBREPLY']._serialized_end=909
+  _globals['_ESTIMATEJOBREQUEST']._serialized_start=911
+  _globals['_ESTIMATEJOBREQUEST']._serialized_end=964
+  _globals['_ESTIMATEJOBREPLY']._serialized_start=966
+  _globals['_ESTIMATEJOBREPLY']._serialized_end=1053
+  _globals['_CANCELJOBREQUEST']._serialized_start=1055
+  _globals['_CANCELJOBREQUEST']._serialized_end=1089
+  _globals['_CANCELJOBREPLY']._serialized_start=1091
+  _globals['_CANCELJOBREPLY']._serialized_end=1166
+  _globals['_FINISHJOBREQUEST']._serialized_start=1168
+  _globals['_FINISHJOBREQUEST']._serialized_end=1239
+  _globals['_FINISHJOBREPLY']._serialized_start=1241
+  _globals['_FINISHJOBREPLY']._serialized_end=1316
+  _globals['_UPDATEJOBREQUEST']._serialized_start=1318
+  _globals['_UPDATEJOBREQUEST']._serialized_end=1352
+  _globals['_UPDATEJOBREPLY']._serialized_start=1354
+  _globals['_UPDATEJOBREPLY']._serialized_end=1429
+  _globals['_SUBSCRIBEJOBREQUEST']._serialized_start=1431
+  _globals['_SUBSCRIBEJOBREQUEST']._serialized_end=1486
+  _globals['_JOBEVENT']._serialized_start=1489
+  _globals['_JOBEVENT']._serialized_end=1890
+  _globals['_JOBEVENT_TYPE']._serialized_start=1787
+  _globals['_JOBEVENT_TYPE']._serialized_end=1873
+  _globals['_JOBSTATUS']._serialized_start=1892
+  _globals['_JOBSTATUS']._serialized_end=1934
+  _globals['_PROGRESS']._serialized_start=1936
+  _globals['_PROGRESS']._serialized_end=1985
+  _globals['_ERRORINFO']._serialized_start=1987
+  _globals['_ERRORINFO']._serialized_end=2029
+  _globals['_DOWNLOADSOLUTIONREQUEST']._serialized_start=2031
+  _globals['_DOWNLOADSOLUTIONREQUEST']._serialized_end=2086
+  _globals['_SOLUTIONCHUNK']._serialized_start=2088
+  _globals['_SOLUTIONCHUNK']._serialized_end=2117
+  _globals['_GETSOLUTIONURLREQUEST']._serialized_start=2119
+  _globals['_GETSOLUTIONURLREQUEST']._serialized_end=2172
+  _globals['_GETSOLUTIONURLREPLY']._serialized_start=2174
+  _globals['_GETSOLUTIONURLREPLY']._serialized_end=2229
+  _globals['_LISTATOMICSREQUEST']._serialized_start=2231
+  _globals['_LISTATOMICSREQUEST']._serialized_end=2282
+  _globals['_LISTATOMICSREPLY']._serialized_start=2284
+  _globals['_LISTATOMICSREPLY']._serialized_end=2345
+  _globals['_ATOMICFORJOB']._serialized_start=2348
+  _globals['_ATOMICFORJOB']._serialized_end=2650
+  _globals['_SDK']._serialized_start=2805
+  _globals['_SDK']._serialized_end=3441
 # @@protoc_insertion_point(module_scope)

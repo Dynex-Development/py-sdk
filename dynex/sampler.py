@@ -1730,11 +1730,12 @@ class _DynexSampler:
                     "shots": shots,
                     "rank": rank,
                     "target_energy": 0.0 - self.clauses[1],
-                    "preprocess": preprocess,  # Pass preprocess to API
                     "job_metadata": job_metadata,  # Automatically set for Circuit BQM
                 }
 
-                job_id, self.filename, price_per_block, qasm = self.api.create_job_api(**params)
+                job_id, self.filename, price_per_block, qasm = self.api.create_job_api_proto(
+                    **params, debugging=debugging
+                )
                 self._timing.job_created = time.time()
                 self._reset_grpc_subscription()
                 self.current_job_id = job_id

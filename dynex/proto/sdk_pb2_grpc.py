@@ -5,7 +5,7 @@ import warnings
 
 from dynex.proto import sdk_pb2 as pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -64,10 +64,10 @@ class SDKStub(object):
                 request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.SubscribeJobRequest.SerializeToString,
                 response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.JobEvent.FromString,
                 _registered_method=True)
-        self.ListSolutions = channel.unary_unary(
-                '/dynex.sdk.v2.SDK/ListSolutions',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsReply.FromString,
+        self.DownloadSolution = channel.unary_stream(
+                '/dynex.sdk.v2.SDK/DownloadSolution',
+                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.DownloadSolutionRequest.SerializeToString,
+                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.SolutionChunk.FromString,
                 _registered_method=True)
         self.ListAtomics = channel.unary_unary(
                 '/dynex.sdk.v2.SDK/ListAtomics',
@@ -117,7 +117,7 @@ class SDKServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def ListSolutions(self, request, context):
+    def DownloadSolution(self, request, context):
         """Solutions
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -164,10 +164,10 @@ def add_SDKServicer_to_server(servicer, server):
                     request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.SubscribeJobRequest.FromString,
                     response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.JobEvent.SerializeToString,
             ),
-            'ListSolutions': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListSolutions,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsReply.SerializeToString,
+            'DownloadSolution': grpc.unary_stream_rpc_method_handler(
+                    servicer.DownloadSolution,
+                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.DownloadSolutionRequest.FromString,
+                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.SolutionChunk.SerializeToString,
             ),
             'ListAtomics': grpc.unary_unary_rpc_method_handler(
                     servicer.ListAtomics,
@@ -348,7 +348,7 @@ class SDK(object):
             _registered_method=True)
 
     @staticmethod
-    def ListSolutions(request,
+    def DownloadSolution(request,
             target,
             options=(),
             channel_credentials=None,
@@ -358,12 +358,12 @@ class SDK(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(
+        return grpc.experimental.unary_stream(
             request,
             target,
-            '/dynex.sdk.v2.SDK/ListSolutions',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsReply.FromString,
+            '/dynex.sdk.v2.SDK/DownloadSolution',
+            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.DownloadSolutionRequest.SerializeToString,
+            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.SolutionChunk.FromString,
             options,
             channel_credentials,
             insecure,
