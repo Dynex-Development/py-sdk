@@ -87,6 +87,7 @@ class DynexConfig:
         default_timeout: float = 300.0,
         default_description: str = "Dynex SDK Job",
         preserve_solutions: bool = False,
+        debug_save_solutions: bool = False,
     ) -> None:
         self.logger = self._init_logger()
         self.retry_count = retry_count
@@ -95,6 +96,7 @@ class DynexConfig:
         self.default_timeout = default_timeout
         self.default_description = default_description
         self.preserve_solutions = preserve_solutions
+        self.debug_save_solutions = debug_save_solutions
 
         # Validate and normalize compute_backend
         if isinstance(compute_backend, ComputeBackend):
@@ -137,11 +139,8 @@ class DynexConfig:
 
         # LOCAL backend uses local dynexcore binary (offline mode)
         # All other backends (CPU, GPU, QPU, UNSPECIFIED) use network mode
-        if is_local:
-            self.mainnet = False
-        else:
-            self.mainnet = True
 
+        self.mainnet = not is_local
         # Load .env file if available (only once per class)
         self._load_dotenv(dotenv_path)
 
@@ -307,4 +306,5 @@ class DynexConfig:
             "default_timeout": self.default_timeout,
             "default_description": self.default_description,
             "preserve_solutions": self.preserve_solutions,
+            "debug_save_solutions": self.debug_save_solutions,
         }

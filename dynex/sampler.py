@@ -397,6 +397,7 @@ class _DynexSampler:
         self._grpc_solution_stats = {}
         self._grpc_solution_remote = {}
         self._grpc_downloaded_files = set()
+        self._solution_cache: dict = {}
         self.preserve_solutions = (
             preserve_solutions if preserve_solutions is not None else self.config.preserve_solutions
         )
@@ -409,7 +410,7 @@ class _DynexSampler:
 
         # multi-model parallel sampling?
         multi_model_mode = False
-        if isinstance(model, list) and not self.config.mainnet:
+        if isinstance(model, list):
             if not self.config.mainnet:
                 raise Exception("Multi model parallel sampling is only supported in network mode")
             multi_model_mode = True
@@ -438,9 +439,10 @@ class _DynexSampler:
                 self.clauses = model.bqm.to_qubo()
                 self.var_mappings = model.var_mappings
                 self.precision = model.precision
-                self._save_wcnf(
-                    self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses, self.var_mappings
-                )
+                if not self.config.mainnet:
+                    self._save_wcnf(
+                        self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses, self.var_mappings
+                    )
 
             elif model.type == "qasm":
                 self.clauses = [0, -9999999999]
@@ -478,13 +480,14 @@ class _DynexSampler:
                     _clauses.append(m.bqm.to_qubo())
                     _var_mappings.append(m.var_mappings)
                     _precision.append(m.precision)
-                    self._save_wcnf(
-                        _clauses[-1],
-                        self.filepath + _filename[-1],
-                        _num_variables[-1],
-                        _num_clauses[-1],
-                        _var_mappings[-1],
-                    )
+                    if not self.config.mainnet:
+                        self._save_wcnf(
+                            _clauses[-1],
+                            self.filepath + _filename[-1],
+                            _num_variables[-1],
+                            _num_clauses[-1],
+                            _var_mappings[-1],
+                        )
                 _type.append(m.type)
                 _assignments.append({})
                 _dimod_assignments.append({})
@@ -615,7 +618,10 @@ class _DynexSampler:
         return
 
     def list_files_with_text_local(self):
-        """List assignment files in tmp directory for current model."""
+        """List available solution keys (in-memory for mainnet, files for local solver)."""
+        if self.config.mainnet:
+            return list(self._solution_cache.keys())
+
         directory = self.filepath_full
         fn = self.filename + "."
         filtered_files = []
@@ -624,9 +630,6 @@ class _DynexSampler:
             if filename.startswith(fn) and not filename.endswith("model"):
                 if os.path.getsize(os.path.join(directory, filename)) > 0:
                     filtered_files.append(filename)
-
-        if self.config.mainnet:
-            filtered_files = [name for name in filtered_files if name in self._grpc_downloaded_files]
 
         return filtered_files
 
@@ -666,6 +669,7 @@ class _DynexSampler:
         self._job_error = None
         self._grpc_solution_remote = {}
         self._grpc_downloaded_files = set()
+        self._solution_cache = {}
 
     def _ensure_grpc_subscription(self):
         if self._grpc_subscription_disabled:
@@ -930,94 +934,90 @@ class _DynexSampler:
             if self.logging:
                 self.logger.warning(f"Local path too long, using hash-based name: {local_name}")
 
-        if os.path.isfile(local_path) and os.path.getsize(local_path) > 0:
-            self._downloaded_solutions.add(remote_name)
-            self._log_debug(f"Solution already present locally name={remote_name} path={local_path}")
-            return
+        # Check if already received (cache for mainnet, file for local solver)
+        if self.config.mainnet:
+            if local_name in self._solution_cache:
+                self._downloaded_solutions.add(remote_name)
+                self._log_debug(f"Solution already in cache name={remote_name} key={local_name}")
+                return
+        else:
+            if os.path.isfile(local_path) and os.path.getsize(local_path) > 0:
+                self._downloaded_solutions.add(remote_name)
+                self._log_debug(f"Solution already present locally name={remote_name} path={local_path}")
+                return
 
-        # Support both inline and presigned URL delivery (if backend supports both)
-        downloaded = False
+        raw_data: bytes | None = None
 
-        # Check for inline data first (if backend supports it and kind == "inline")
+        # Decode inline data (kind == "inline")
         if inline_data and kind == "inline":
             try:
                 self._log_debug(
                     f"Processing inline solution data name={remote_name} kind={kind} data_len={len(inline_data)}"
                 )
-                if self.logging:
-                    self.logger.debug(
-                        f"Processing inline solution: name={remote_name}, "
-                        f"data_len={len(inline_data)}, compression={compression_hint}"
-                    )
                 import base64
 
-                # Decode base64
                 try:
                     compressed_data = base64.b64decode(inline_data)
                 except Exception as decode_exc:
-                    # Try without base64 if it's already raw data
                     if self.logging:
                         self.logger.warning(f"Base64 decode failed, trying raw data: {decode_exc}")
                     compressed_data = inline_data.encode("utf-8") if isinstance(inline_data, str) else inline_data
 
-                # Decompress if needed
-                if compression_hint:
-                    raw_data = self._decompress_bytes(compressed_data, compression_hint)
-                else:
-                    raw_data = compressed_data
-
-                directory = os.path.dirname(local_path)
-                if directory:
-                    os.makedirs(directory, exist_ok=True)
-                with open(local_path, "wb") as fh:
-                    fh.write(raw_data)
-                downloaded = True
-                self._log_debug(f"Inline solution saved name={remote_name} path={local_path} size={len(raw_data)}")
-                if self.logging:
-                    self.logger.debug(
-                        f"Inline solution saved successfully: {remote_name}, " f"file_size={len(raw_data)} bytes"
-                    )
+                raw_data = self._decompress_bytes(compressed_data, compression_hint) if compression_hint else compressed_data
+                self._log_debug(f"Inline solution decoded name={remote_name} size={len(raw_data)}")
             except Exception as exc:
                 if self.logging:
                     self.logger.error(f"Inline data processing error {remote_name}: {exc}", exc_info=True)
                 self._log_debug(f"Inline data processing failed name={remote_name} error={exc}")
 
-        # Use presigned URL (primary method for current backend)
-        if not downloaded and url:
+        # Fetch via presigned URL if inline data was not available
+        if raw_data is None and url:
             try:
                 self._log_debug(f"Downloading solution via presigned URL name={remote_name} url={url[:50]}...")
                 import urllib.request
 
                 with urllib.request.urlopen(url) as response:
-                    raw_data = response.read()
-                    # Decompress if needed
-                    if compression_hint:
-                        raw_data = self._decompress_bytes(raw_data, compression_hint)
-                    directory = os.path.dirname(local_path)
-                    if directory:
-                        os.makedirs(directory, exist_ok=True)
-                    with open(local_path, "wb") as fh:
-                        fh.write(raw_data)
-                downloaded = True
+                    fetched = response.read()
+                raw_data = self._decompress_bytes(fetched, compression_hint) if compression_hint else fetched
             except Exception as exc:
                 if self.logging:
                     self.logger.error(f"Presigned URL download error {remote_name}: {exc}")
                 self._log_debug(f"Presigned URL download failed name={remote_name} error={exc}")
 
-        # Final fallback - if no URL and no inline data, solution is not available
-        if not downloaded:
+        if raw_data is None:
             self._log_debug(
-                f"Solution not available: no URL and no inline data name={remote_name} kind={kind} has_inline={bool(inline_data)} has_url={bool(url)}"
+                f"Solution not available: no URL and no inline data name={remote_name} kind={kind} "
+                f"has_inline={bool(inline_data)} has_url={bool(url)}"
             )
-            # Solutions should come via SubscribeJob streaming with presigned URL
-            # If URL is missing, the solution may not be ready yet or backend error
             return
 
+        # Store solution: in-memory for mainnet, on disk for local solver.
+        # Write to disk only when debug_save_solutions is enabled (debug/analysis).
+        if self.config.mainnet:
+            self._solution_cache[local_name] = raw_data
+            if self.config.debug_save_solutions:
+                try:
+                    os.makedirs(os.path.dirname(local_path) or self.filepath, exist_ok=True)
+                    with open(local_path, "wb") as fh:
+                        fh.write(raw_data)
+                    self._log_debug(f"Debug: solution saved to disk name={remote_name} path={local_path}")
+                except OSError as exc:
+                    if self.logging:
+                        self.logger.warning(f"Debug file write failed {local_path}: {exc}")
+        else:
+            os.makedirs(os.path.dirname(local_path) or self.filepath, exist_ok=True)
+            with open(local_path, "wb") as fh:
+                fh.write(raw_data)
+            self._log_debug(f"Solution saved to disk name={remote_name} path={local_path} size={len(raw_data)}")
+
+        # Validate (currently always returns True; kept for future checks)
         if not self.validate_file(local_name):
-            self._log_debug(f"Solution validation failed name={remote_name} path={local_path}")
+            self._log_debug(f"Solution validation failed name={remote_name}")
             if self.logging:
-                self.logger.warning(f"Solution validation failed for {remote_name}, not adding to downloaded_solutions")
-            if os.path.exists(local_path):
+                self.logger.warning(f"Solution validation failed for {remote_name}, discarding")
+            if self.config.mainnet:
+                self._solution_cache.pop(local_name, None)
+            elif os.path.exists(local_path):
                 os.remove(local_path)
             try:
                 self.api.report_invalid(filename=remote_name, reason="wrong energy reported")
@@ -1028,22 +1028,20 @@ class _DynexSampler:
         self._downloaded_solutions.add(remote_name)
         solutions_count = len(self._downloaded_solutions)
 
-        # Log progress
         if self.logging:
             self.logger.debug(
-                f"Solution added to downloaded_solutions: {remote_name}, " f"total_count={solutions_count}"
+                f"Solution added to downloaded_solutions: {remote_name}, total_count={solutions_count}"
             )
-            # Show progress on INFO level and track timing
             expected = getattr(self, "expected_shots", None)
             if expected:
                 self.logger.info(f"Shot {solutions_count}/{expected} received")
-                # Track first shot timing
                 timing = getattr(self, "_timing", None)
                 if timing and timing.first_shot is None and solutions_count == 1:
                     timing.first_shot = time.time()
+
         local_basename = os.path.basename(local_path)
-        self._grpc_downloaded_files.add(local_basename)
-        key_candidates = {safe_name, local_basename, remote_name}
+        self._grpc_downloaded_files.add(local_name)
+        key_candidates = {safe_name, local_name, local_basename, remote_name}
         for key in list(key_candidates):
             if not key:
                 continue
@@ -1051,10 +1049,10 @@ class _DynexSampler:
             if stats_copy:
                 self._grpc_solution_stats[key] = dict(stats_copy)
         if stats_copy:
-            self._grpc_solution_stats[local_basename] = dict(stats_copy)
-        self._grpc_solution_meta[local_basename] = solution
+            self._grpc_solution_stats[local_name] = dict(stats_copy)
+        self._grpc_solution_meta[local_name] = solution
         self._log_debug(
-            f"Solution stored name={remote_name} path={local_path} downloaded_count={len(self._downloaded_solutions)}"
+            f"Solution stored name={remote_name} key={local_name} downloaded_count={len(self._downloaded_solutions)}"
         )
 
     def list_files_with_text(self):
@@ -1353,7 +1351,8 @@ class _DynexSampler:
             self.clauses = model.to_qubo()
             self.var_mappings = model.var_mappings
             self.precision = model.precision
-            self._save_wcnf(self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses)
+            if not self.config.mainnet:
+                self._save_wcnf(self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses, self.var_mappings)
 
         self.type = model.type
         self.assignments = {}
@@ -1361,7 +1360,24 @@ class _DynexSampler:
         self.bqm = model.bqm
 
     def delete_local_files_by_prefix(self, directory: str, prefix: str):
-        for filename in os.listdir(directory):
+        if self.config.mainnet:
+            keys = [k for k in self._solution_cache if k.startswith(prefix)]
+            for k in keys:
+                del self._solution_cache[k]
+            if keys:
+                self._log_debug(f"Cleared {len(keys)} cached solutions prefix={prefix}")
+            if self.config.debug_save_solutions:
+                self._delete_files_by_prefix(directory, prefix)
+            return
+
+        self._delete_files_by_prefix(directory, prefix)
+
+    def _delete_files_by_prefix(self, directory: str, prefix: str):
+        try:
+            entries = os.listdir(directory)
+        except OSError:
+            return
+        for filename in entries:
             if filename.startswith(prefix):
                 file_path = os.path.join(directory, filename)
                 try:
@@ -1452,7 +1468,7 @@ class _DynexSampler:
 
             self.logger.info(f"No valid sample result found. Resampling... {i + 1} / {self.num_retries}")
             self.filename = secrets.token_hex(16) + ".dnx"
-            if self.type == "wcnf":
+            if self.type == "wcnf" and not self.config.mainnet:
                 self._save_wcnf(
                     self.clauses,
                     self.filepath + self.filename,
@@ -1468,14 +1484,21 @@ class _DynexSampler:
         return retval
 
     def read_voltage_data(self, file, mainnet, rank):
+        if mainnet:
+            data = self._solution_cache.get(file)
+            if data is None:
+                self.logger.error(f"Solution not in cache: {file}")
+                return ["NaN"]
+            skip_first = self.type == "qasm"
+            if rank == 1:
+                return self._extract_voltage_values(data, prefer_last=False, skip_first=skip_first)
+            return self._extract_voltage_values(data, prefer_last=(rank > 1), skip_first=skip_first)
+
         file_path = os.path.join(self.filepath, file)
         try:
             with open(file_path, "rb") as ffile:
-                if mainnet and rank == 1:
-                    return self._read_second_line(ffile)
                 prefer_last = rank > 1
                 return self._read_last_non_empty_line(ffile) if prefer_last else self._read_entire_file(ffile)
-
         except (IOError, OSError) as e:
             self.logger.error(f"Error reading file {file_path}: {e}")
             return ["NaN"]
@@ -1772,13 +1795,14 @@ class _DynexSampler:
                     self.clauses = _model.bqm.to_qubo()
                     self.var_mappings = _model.var_mappings
                     self.precision = _model.precision
-                    self._save_wcnf(
-                        self.clauses,
-                        self.filepath + self.filename,
-                        self.num_variables,
-                        self.num_clauses,
-                        self.var_mappings,
-                    )
+                    if self.config.debug_save_solutions:
+                        self._save_wcnf(
+                            self.clauses,
+                            self.filepath + self.filename,
+                            self.num_variables,
+                            self.num_clauses,
+                            self.var_mappings,
+                        )
                     self.model.clauses = self.clauses
                     self.model.num_variables = self.num_variables
                     self.model.num_clauses = self.num_clauses
@@ -2393,8 +2417,9 @@ class _DynexSampler:
                 sample_dict = self._convert(sample)
                 sampleset_clean.append(sample_dict)
 
-            # Delete local files
-            if self.config.remove_local_solutions and not self.preserve_solutions:
+            # Delete local files: always on mainnet unless preserve_solutions=True,
+            # or on local solver when remove_local_solutions=True.
+            if (self.config.mainnet or self.config.remove_local_solutions) and not self.preserve_solutions:
                 self.delete_local_files_by_prefix(self.filepath, self.filename)
 
         except KeyboardInterrupt:

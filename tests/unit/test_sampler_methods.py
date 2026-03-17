@@ -169,24 +169,39 @@ def test_clean_calls_list_files(mock_model):
 
 
 def test_delete_local_files_by_prefix(mock_model, tmp_path):
-    """Test delete_local_files_by_prefix removes matching files."""
-    config = DynexConfig(compute_backend="cpu")
+    """Test delete_local_files_by_prefix removes matching files for local solver."""
+    config = DynexConfig(compute_backend="local")
 
     with patch("dynex.grpc_client.DynexGrpcClient"):
         sampler = _DynexSampler(mock_model, logging=False, config=config)
 
-        # Create test files
         (tmp_path / "prefix_file1.txt").write_text("test1")
         (tmp_path / "prefix_file2.txt").write_text("test2")
         (tmp_path / "other_file.txt").write_text("other")
 
         sampler.delete_local_files_by_prefix(str(tmp_path), "prefix_")
 
-        # Prefix files should be removed
         assert not (tmp_path / "prefix_file1.txt").exists()
         assert not (tmp_path / "prefix_file2.txt").exists()
-        # Other file should remain
         assert (tmp_path / "other_file.txt").exists()
+
+
+def test_delete_local_files_by_prefix_mainnet_clears_cache(mock_model):
+    """Test delete_local_files_by_prefix clears in-memory cache for mainnet."""
+    config = DynexConfig(compute_backend="cpu")
+
+    with patch("dynex.grpc_client.DynexGrpcClient"):
+        sampler = _DynexSampler(mock_model, logging=False, config=config)
+
+        sampler._solution_cache["prefix_abc.solution_1"] = b"data1"
+        sampler._solution_cache["prefix_abc.solution_2"] = b"data2"
+        sampler._solution_cache["other_abc.solution_3"] = b"data3"
+
+        sampler.delete_local_files_by_prefix("tmp/", "prefix_abc")
+
+        assert "prefix_abc.solution_1" not in sampler._solution_cache
+        assert "prefix_abc.solution_2" not in sampler._solution_cache
+        assert "other_abc.solution_3" in sampler._solution_cache
 
 
 def test_convert_dict_to_list(mock_model):
