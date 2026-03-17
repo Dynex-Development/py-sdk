@@ -204,6 +204,113 @@ def test_delete_local_files_by_prefix_mainnet_clears_cache(mock_model):
         assert "other_abc.solution_3" in sampler._solution_cache
 
 
+def _make_solution(name, raw_bytes, kind="inline"):
+    """Build a minimal solution-like object for _consume_solution_meta."""
+    import base64
+
+    encoded = base64.b64encode(raw_bytes).decode("ascii")
+    obj = type("S", (), {
+        "name": name,
+        "data": encoded,
+        "url": "",
+        "kind": kind,
+        "compression": "",
+        "valid": True,
+        "subject": "",
+        "checksum": "",
+        "size": len(raw_bytes),
+        "compressed_size": 0,
+    })()
+    obj.ListFields = lambda: []
+    return obj
+
+
+def test_consume_solution_meta_mainnet_stores_in_cache(mock_model, tmp_path):
+    """On mainnet without debug, solution goes into _solution_cache only — no file written."""
+    config = DynexConfig(compute_backend="cpu")
+
+    with patch("dynex.grpc_client.DynexGrpcClient"):
+        sampler = _DynexSampler(mock_model, logging=False, config=config)
+        sampler.filename = "job_abc"
+        sampler.filepath = str(tmp_path) + "/"
+        sampler.current_job_id = 42
+
+        raw = b"1,0,1,0"
+        solution = _make_solution("solution_x", raw)
+
+        sampler._consume_solution_meta(solution)
+
+        local_name = "job_abc.solution_x"
+        assert local_name in sampler._solution_cache
+        assert sampler._solution_cache[local_name] == raw
+        assert not (tmp_path / local_name).exists()
+
+
+def test_consume_solution_meta_debug_writes_file(mock_model, tmp_path):
+    """With debug_save_solutions=True on mainnet, solution is in cache AND written to disk."""
+    config = DynexConfig(compute_backend="cpu", debug_save_solutions=True)
+
+    with patch("dynex.grpc_client.DynexGrpcClient"):
+        sampler = _DynexSampler(mock_model, logging=False, config=config)
+        sampler.filename = "job_debug"
+        sampler.filepath = str(tmp_path) + "/"
+        sampler.current_job_id = 1
+
+        raw = b"0,1,0,1"
+        solution = _make_solution("solution_y", raw)
+
+        sampler._consume_solution_meta(solution)
+
+        local_name = "job_debug.solution_y"
+        assert local_name in sampler._solution_cache
+        assert sampler._solution_cache[local_name] == raw
+        assert (tmp_path / local_name).exists()
+        assert (tmp_path / local_name).read_bytes() == raw
+
+
+def test_delete_local_files_by_prefix_debug_deletes_files(mock_model, tmp_path):
+    """With debug_save_solutions=True, delete also removes physical debug files."""
+    config = DynexConfig(compute_backend="cpu", debug_save_solutions=True)
+
+    with patch("dynex.grpc_client.DynexGrpcClient"):
+        sampler = _DynexSampler(mock_model, logging=False, config=config)
+
+        sampler._solution_cache["prefix_x.sol_1"] = b"d1"
+        sampler._solution_cache["prefix_x.sol_2"] = b"d2"
+        sampler._solution_cache["other_x.sol_3"] = b"d3"
+
+        (tmp_path / "prefix_x.sol_1").write_bytes(b"d1")
+        (tmp_path / "prefix_x.sol_2").write_bytes(b"d2")
+        (tmp_path / "other_x.sol_3").write_bytes(b"d3")
+
+        sampler.delete_local_files_by_prefix(str(tmp_path), "prefix_x")
+
+        assert "prefix_x.sol_1" not in sampler._solution_cache
+        assert "prefix_x.sol_2" not in sampler._solution_cache
+        assert "other_x.sol_3" in sampler._solution_cache
+        assert not (tmp_path / "prefix_x.sol_1").exists()
+        assert not (tmp_path / "prefix_x.sol_2").exists()
+        assert (tmp_path / "other_x.sol_3").exists()
+
+
+def test_list_files_with_text_local_returns_cache_keys(mock_model):
+    """On mainnet, list_files_with_text_local returns all _solution_cache keys."""
+    config = DynexConfig(compute_backend="cpu")
+
+    with patch("dynex.grpc_client.DynexGrpcClient"):
+        sampler = _DynexSampler(mock_model, logging=False, config=config)
+
+        sampler._solution_cache["job_list.sol_a"] = b"a"
+        sampler._solution_cache["job_list.sol_b"] = b"b"
+        sampler._solution_cache["other_job.sol_c"] = b"c"
+
+        result = sampler.list_files_with_text_local()
+
+        assert "job_list.sol_a" in result
+        assert "job_list.sol_b" in result
+        assert "other_job.sol_c" in result
+
+
 def test_convert_dict_to_list(mock_model):
     """Test _convert transforms dict values to list."""
     config = DynexConfig(compute_backend="cpu")
