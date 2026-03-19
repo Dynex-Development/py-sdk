@@ -56,6 +56,7 @@ except ModuleNotFoundError:
 
 from dynex.api import DynexAPI
 from dynex.config import DynexConfig
+from dynex.exceptions import DynexJobError, DynexModelError, DynexSolverError, DynexValidationError
 from dynex.models import BQM
 from dynex.proto import sdk_pb2
 
@@ -210,11 +211,11 @@ class DynexSampler:
 
         # assert parameters:
         if clones < 1:
-            raise Exception("Value of clones must be in range [1,128]")
+            raise DynexValidationError("Value of clones must be in range [1,128]")
         if clones > 128:
-            raise Exception("Value of clones must be in range [1,128]")
+            raise DynexValidationError("Value of clones must be in range [1,128]")
         if not self.config.mainnet and clones > 1:
-            raise Exception("Clone sampling is only supported in network mode")
+            raise DynexValidationError("Clone sampling is only supported in network mode")
 
         # Apollo QPU limitation: annealing_time cannot exceed 10000
         MAX_ANNEALING_TIME_QPU = 10000
@@ -365,8 +366,8 @@ class _DynexSampler:
         job_metadata: Optional[dict] = None,
     ):
 
-        if model.type not in ["cnf", "wcnf", "qasm"]:
-            raise Exception("INCORRECT MODEL TYPE:", model.type)
+        if model.type not in ("cnf", "wcnf", "qasm"):
+            raise DynexModelError(f"Unsupported model type: {model.type}")
 
         self.config = config if config is not None else DynexConfig()
         self.description = description if description is not None else self.config.default_description
@@ -412,7 +413,7 @@ class _DynexSampler:
         multi_model_mode = False
         if isinstance(model, list):
             if not self.config.mainnet:
-                raise Exception("Multi model parallel sampling is only supported in network mode")
+                raise DynexValidationError("Multi model parallel sampling is only supported in network mode")
             multi_model_mode = True
 
         self.multi_model_mode = multi_model_mode
@@ -1181,7 +1182,7 @@ class _DynexSampler:
         shift = 0
         while True:
             if index >= len(buffer):
-                raise ValueError("truncated varint while decoding solution payload")
+                raise DynexJobError("truncated varint while decoding solution payload")
             byte = buffer[index]
             index += 1
             result |= (byte & 0x7F) << shift
@@ -1189,7 +1190,7 @@ class _DynexSampler:
                 return result, index
             shift += 7
             if shift >= 64:
-                raise ValueError("varint overflow while decoding solution payload")
+                raise DynexJobError("varint overflow while decoding solution payload")
 
     @classmethod
     def _skip_field(cls, buffer: bytes, index: int, wire_type: int) -> int:
@@ -1207,7 +1208,7 @@ class _DynexSampler:
         elif wire_type == 5:
             index += 4
         else:
-            raise ValueError(f"unknown wire type {wire_type} while decoding solution payload")
+            raise DynexJobError(f"unknown wire type {wire_type} while decoding solution payload")
         return index
 
     @classmethod
@@ -1591,7 +1592,7 @@ class _DynexSampler:
         self._timing = SamplingTiming()
 
         if self.multi_model_mode is True:
-            raise Exception("Multi-model parallel sampling is not implemented yet")
+            raise DynexJobError("Multi-model parallel sampling is not implemented yet")
 
         # Apollo QPU limitation: annealing_time cannot exceed 10000
         MAX_ANNEALING_TIME_QPU = 10000
@@ -1772,11 +1773,11 @@ class _DynexSampler:
                         self.logger.error(
                             "This indicates the backend doesn't support QASM conversion or the converter failed."
                         )
-                        raise ValueError("QASM data is None. Backend may not support QASM processing.")
+                        raise DynexJobError("QASM data is None. Backend may not support QASM processing.")
                     _data = qasm
                     if not isinstance(_data, dict) or "feed_dict" not in _data or "model" not in _data:
                         self.logger.error(f"Invalid QASM data format: {type(_data)}")
-                        raise ValueError("Invalid QASM data format. Expected dict with 'feed_dict' and 'model' keys.")
+                        raise DynexJobError("Invalid QASM data format. Expected dict with 'feed_dict' and 'model' keys.")
                     _feed_dict = _data["feed_dict"]
                     _model = _data["model"]
                     if debugging:
@@ -1904,7 +1905,7 @@ class _DynexSampler:
                     # Always use v2 format (dynexcore)
                     population_size = num_reads
                     if rank > population_size:
-                        raise Exception(
+                        raise DynexValidationError(
                             f"Rank must be equal to population size! Shots:{rank} Population:{population_size}"
                         )
                     command = self.solver_path + "dynexcore"
@@ -2004,7 +2005,7 @@ class _DynexSampler:
                     error_msg = f"Job failed: {self._job_error}"
                     if self.logging:
                         self.logger.error(f"{error_msg}")
-                    raise RuntimeError(error_msg)
+                    raise DynexJobError(error_msg)
 
                 # Check timeout
                 elapsed_real_time = time.time() - t_start
@@ -2019,7 +2020,7 @@ class _DynexSampler:
                         )
                         if self.logging:
                             self.logger.error(f"{error_msg}")
-                        raise RuntimeError(error_msg)
+                        raise DynexJobError(error_msg)
                     else:
                         if self.logging:
                             self.logger.warning(

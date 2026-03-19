@@ -42,6 +42,14 @@ from .api import DynexAPI
 from .compute_backend import ComputeBackend
 from .config import DynexConfig
 from .dynex_circuit import DynexCircuit
+from .exceptions import (
+    DynexConnectionError,
+    DynexError,
+    DynexJobError,
+    DynexModelError,
+    DynexSolverError,
+    DynexValidationError,
+)
 from .models import BQM, CQM, DQM
 from .preprocessing import scale_bqm_to_range
 from .qpu_models import QPUModel
@@ -51,11 +59,7 @@ from .utils import sample_qubo
 __author__ = "Dynex Developers"
 __credits__ = "Dynex Developers, Contributors, Supporters and the Dynex Community"
 
-# Get version from package metadata
 try:
-    __version__ = version("dynex-nightly")
+    __version__ = version("dynex")
 except Exception:
-    try:
-        __version__ = version("dynex")
-    except Exception:
-        __version__ = "unknown"
+    __version__ = "0.0.0-dev"

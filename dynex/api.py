@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from dynex.compute_backend import ComputeBackend
 from dynex.config import DynexConfig
+from dynex.exceptions import DynexValidationError
 from dynex.interfaces.api import Job
 
 if TYPE_CHECKING:
@@ -321,7 +322,7 @@ class JobOptions(BaseModel):
             v_lower = v.lower()
             valid_values = ["unspecified", "cpu", "gpu", "qpu"]
             if v_lower not in valid_values:
-                raise ValueError(f"compute_backend must be one of {valid_values}, got '{v}'")
+                raise DynexValidationError(f"compute_backend must be one of {valid_values}, got '{v}'")
             return v_lower
         return "unspecified"
 

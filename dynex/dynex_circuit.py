@@ -40,6 +40,7 @@ from pennylane import numpy as np
 
 import dynex
 from dynex import DynexConfig
+from dynex.exceptions import DynexJobError, DynexValidationError
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -481,7 +482,7 @@ class DynexCircuit:
 
         # decode solution:
         if method not in ["measure", "probs", "all", "sampleset"]:
-            raise ValueError("Method must be either 'measure', 'probs', 'all' or 'sampleset'")
+            raise DynexValidationError("Method must be either 'measure', 'probs', 'all' or 'sampleset'")
 
         if logging:
             self.logger.info(f"-------------- /  {method}  / ------------")
@@ -491,7 +492,7 @@ class DynexCircuit:
                 self.logger.error(
                     "No valid solution found. The quantum circuit may be too complex or the solver timed out."
                 )
-                raise ValueError("SampleSet is empty - no solution was found for the quantum circuit")
+                raise DynexJobError("SampleSet is empty - no solution was found for the quantum circuit")
 
             # For QASM converted to WCNF, we need to use var_mappings to decode
             # Check if we have access to var_mappings through the sampler

@@ -37,6 +37,7 @@ from urllib.parse import urlparse
 
 import grpc
 
+from dynex.exceptions import DynexConnectionError, DynexJobError, DynexValidationError
 from dynex.proto import sdk_pb2, sdk_pb2_grpc
 
 if TYPE_CHECKING:
@@ -152,7 +153,7 @@ class DynexGrpcClient:
             # Fallback: derive from gRPC endpoint
             endpoint = self.config.grpc_endpoint
             if not endpoint:
-                raise ValueError("GRPC_ENDPOINT is not configured")
+                raise DynexValidationError("GRPC_ENDPOINT is not configured")
             if "://" not in endpoint:
                 endpoint = f"https://{endpoint}"
             parsed = urlparse(endpoint)
@@ -291,16 +292,16 @@ class DynexGrpcClient:
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
                 else:
-                    raise RuntimeError(f"gRPC job creation failed: {e}") from e
+                    raise DynexConnectionError(f"gRPC job creation failed: {e}") from e
             except Exception as e:
                 last_exception = e
                 self._log_error(f"Unexpected error: {e}")
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
                 else:
-                    raise RuntimeError(f"Job creation failed: {e}") from e
+                    raise DynexJobError(f"Job creation failed: {e}") from e
 
-        raise RuntimeError(
+        raise DynexJobError(
             f"Job creation failed after {retry_count} attempts: {str(last_exception)}"
         ) from last_exception
 
@@ -371,16 +372,16 @@ class DynexGrpcClient:
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
                 else:
-                    raise RuntimeError(f"gRPC job creation failed: {e}") from e
+                    raise DynexConnectionError(f"gRPC job creation failed: {e}") from e
             except Exception as e:
                 last_exception = e
                 self._log_error(f"Unexpected error: {e}")
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
                 else:
-                    raise RuntimeError(f"Job creation failed: {e}") from e
+                    raise DynexJobError(f"Job creation failed: {e}") from e
 
-        raise RuntimeError(
+        raise DynexJobError(
             f"Job creation failed after {retry_count} attempts: {str(last_exception)}"
         ) from last_exception
 
