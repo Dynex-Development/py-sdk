@@ -27,21 +27,19 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import ast
-import io
 import json
 import logging
 import math
 import multiprocessing
 import os
 import queue
-import re
 import secrets
 import subprocess
 import threading
 import time
 import zlib
 from dataclasses import dataclass, field
-from typing import NamedTuple, Optional
+from typing import Optional
 
 import dimod
 import neal
@@ -54,6 +52,22 @@ try:
 except ModuleNotFoundError:
     grpc = None  # type: ignore
 
+from dynex._solution_parser import (
+    SolutionMetrics,
+    coerce_float,
+    coerce_int,
+    decode_varint,
+    decompress_bytes,
+    extract_solution_stats,
+    parse_solution_numbers,
+    parse_solution_subject,
+    protobuf_has_field,
+    sanitize_solution_name,
+    skip_field,
+    skip_group,
+    solution_metrics_from_filename,
+)
+from dynex._voltage import ensure_voltage_text, extract_voltage_values, process_voltage_line
 from dynex.api import DynexAPI
 from dynex.config import DynexConfig
 from dynex.exceptions import DynexJobError, DynexModelError, DynexSolverError, DynexValidationError
@@ -64,13 +78,6 @@ try:
     import zstandard as zstd
 except ModuleNotFoundError:
     zstd = None  # type: ignore
-
-
-class SolutionMetrics(NamedTuple):
-    chips: int
-    steps: int
-    loc: int
-    energy: float
 
 
 @dataclass
@@ -1064,212 +1071,44 @@ class _DynexSampler:
 
         # FTP removed - using gRPC only
 
-    @staticmethod
-    def _sanitize_solution_name(name: str) -> str:
-        if not name:
-            return "solution"
-        sanitized = re.sub(r"[^A-Za-z0-9_.-]", "_", name)
-        return sanitized or "solution"
-
-    @staticmethod
-    def _parse_solution_subject(subject: str) -> dict:
-        if not subject:
-            return {}
-        try:
-            data = json.loads(subject)
-            if isinstance(data, dict):
-                return data
-        except (TypeError, ValueError):
-            pass
-        tokens = re.split(r"[;,]\s*", subject)
-        data: dict[str, str] = {}
-        for token in tokens:
-            if "=" not in token:
-                continue
-            key, value = token.split("=", 1)
-            key = key.strip()
-            value = value.strip()
-            if key:
-                data[key] = value
-        return data
-
-    @staticmethod
-    def _parse_solution_numbers(text: str) -> dict:
-        if not text:
-            return {}
-        matches = re.findall(r"-?\d+(?:\.\d+)?", text)
-        if len(matches) < 4:
-            return {}
-        result: dict[str, float] = {}
-        try:
-            result["chips"] = int(float(matches[0]))
-            result["steps"] = int(float(matches[1]))
-            result["loc"] = int(float(matches[2]))
-            result["energy"] = float(matches[3])
-        except ValueError:
-            return {}
-        return result
+    _sanitize_solution_name = staticmethod(sanitize_solution_name)
+    _parse_solution_subject = staticmethod(parse_solution_subject)
+    _parse_solution_numbers = staticmethod(parse_solution_numbers)
+    _coerce_int = staticmethod(coerce_int)
+    _coerce_float = staticmethod(coerce_float)
+    _decompress_bytes = staticmethod(decompress_bytes)
+    _decode_varint = staticmethod(decode_varint)
+    _skip_field = staticmethod(skip_field)  # type: ignore[assignment]
+    _skip_group = staticmethod(skip_group)  # type: ignore[assignment]
+    _protobuf_has_field = staticmethod(protobuf_has_field)
 
     def _extract_solution_stats(self, solution, remote_name: str) -> dict:
-        subject = getattr(solution, "subject", "")
-        subject_stats_raw = self._parse_solution_subject(subject)
-        subject_stats = dict(subject_stats_raw) if subject_stats_raw else {}
-        stats: dict[str, object] = {}
-        if subject_stats:
-            stats.update(subject_stats)
-            data_field = subject_stats.get("data") or subject_stats.get("payload") or subject_stats.get("inline_data")
-            if data_field:
-                stats["inline_data"] = data_field
-        numeric_stats = {}
-        for key in ("chips", "steps", "loc", "energy"):
-            if key in stats:
-                continue
-            value = subject_stats.get(key)
-            if value is None:
-                continue
-            numeric_stats[key] = value
-        if not numeric_stats:
-            numeric_stats = self._parse_solution_numbers(remote_name)
-        stats.update(numeric_stats)
-        # Clean up any legacy fields
-        if subject_stats:
-            subject_stats = dict(subject_stats)
-            subject_stats.pop("data", None)
-            subject_stats.pop("payload", None)
-        stats["subject_dict"] = subject_stats
-        return stats
-
-    @staticmethod
-    def _coerce_int(value):
-        if value is None or value == "":
-            return None
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            try:
-                return int(float(value))
-            except (TypeError, ValueError):
-                return None
-
-    @staticmethod
-    def _coerce_float(value):
-        if value is None or value == "":
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
-    @staticmethod
-    def _decompress_bytes(data: bytes, compression: str | None) -> bytes:
-        if not compression:
-            return data
-        compression = compression.lower()
-        if compression == "zstd":
-            if zstd is None:
-                raise ModuleNotFoundError("zstandard is required to decode zstd-compressed solutions")
-            decompressor = zstd.ZstdDecompressor()
-            try:
-                return decompressor.decompress(data)
-            except zstd.ZstdError:
-                with decompressor.stream_reader(io.BytesIO(data)) as reader:
-                    return reader.read()
-        return data
-
-    @staticmethod
-    def _decode_varint(buffer: bytes, index: int) -> tuple[int, int]:
-        result = 0
-        shift = 0
-        while True:
-            if index >= len(buffer):
-                raise DynexJobError("truncated varint while decoding solution payload")
-            byte = buffer[index]
-            index += 1
-            result |= (byte & 0x7F) << shift
-            if not (byte & 0x80):
-                return result, index
-            shift += 7
-            if shift >= 64:
-                raise DynexJobError("varint overflow while decoding solution payload")
-
-    @classmethod
-    def _skip_field(cls, buffer: bytes, index: int, wire_type: int) -> int:
-        if wire_type == 0:
-            _, index = cls._decode_varint(buffer, index)
-        elif wire_type == 1:
-            index += 8
-        elif wire_type == 2:
-            length, index = cls._decode_varint(buffer, index)
-            index += length
-        elif wire_type == 3:
-            index = cls._skip_group(buffer, index)
-        elif wire_type == 4:
-            pass
-        elif wire_type == 5:
-            index += 4
-        else:
-            raise DynexJobError(f"unknown wire type {wire_type} while decoding solution payload")
-        return index
-
-    @classmethod
-    def _skip_group(cls, buffer: bytes, index: int) -> int:
-        while True:
-            tag, index = cls._decode_varint(buffer, index)
-            wire_type = tag & 0x7
-            if wire_type == 4:
-                return index
-            index = cls._skip_field(buffer, index, wire_type)
-
-    @staticmethod
-    def _protobuf_has_field(message, field_name: str) -> bool:
-        descriptor = getattr(message, "DESCRIPTOR", None)
-        if descriptor is None or field_name not in descriptor.fields_by_name:
-            return False
-        try:
-            return message.HasField(field_name)
-        except ValueError:
-            return False
+        return extract_solution_stats(solution, remote_name)
 
     def _lookup_grpc_stats(self, filename: str, info: str) -> dict:
         stats = self._grpc_solution_stats.get(filename, {})
         if not stats:
             stats = self._grpc_solution_stats.get(info, {})
         if not stats:
-            remote_lookup = self._grpc_solution_remote.get(filename) or self._grpc_solution_remote.get(info)
+            remote_lookup = (
+                self._grpc_solution_remote.get(filename)
+                or self._grpc_solution_remote.get(info)
+            )
             if remote_lookup:
                 stats = self._grpc_solution_stats.get(remote_lookup, {})
         return stats
 
-    def _solution_metrics_from_filename(self, filename: str, fallback_info: str, stats: dict) -> SolutionMetrics:
-        chips = self._coerce_int(stats.get("chips")) if stats else None
-        steps = self._coerce_int(stats.get("steps")) if stats else None
-        loc = self._coerce_int(stats.get("loc")) if stats else None
-        energy = self._coerce_float(stats.get("energy")) if stats else None
-
-        if chips is None or steps is None or loc is None or energy is None:
-            parsed = self._parse_solution_numbers(fallback_info)
-            if chips is None:
-                chips = parsed.get("chips")
-            if steps is None:
-                steps = parsed.get("steps")
-            if loc is None:
-                loc = parsed.get("loc")
-            if energy is None:
-                energy = parsed.get("energy")
-
-        return SolutionMetrics(
-            chips=self._coerce_int(chips) or 0,
-            steps=self._coerce_int(steps) or 0,
-            loc=self._coerce_int(loc) or 0,
-            energy=self._coerce_float(energy) or 0.0,
-        )
+    def _solution_metrics_from_filename(
+        self, filename: str, fallback_info: str, stats: dict
+    ) -> SolutionMetrics:
+        return solution_metrics_from_filename(filename, fallback_info, stats)
 
     def _get_solution_metrics(self, filename: str) -> SolutionMetrics:
-        info = filename[len(self.filename) + 1 :]
+        info = filename[len(self.filename) + 1:]
         stats = {}
         if self.config.mainnet:
             stats = self._lookup_grpc_stats(filename, info)
-        return self._solution_metrics_from_filename(filename, info, stats)
+        return solution_metrics_from_filename(filename, info, stats)
 
     def _list_files_with_text_ftp(self):
         """FTP method removed - using gRPC only"""
@@ -1522,51 +1361,9 @@ class _DynexSampler:
         skip_first = self.type == "qasm"
         return self._extract_voltage_values(data, prefer_last=False, skip_first=skip_first)
 
-    @staticmethod
-    def _extract_voltage_values(line, prefer_last=False, skip_first=False):
-        text_line = _DynexSampler._ensure_voltage_text(line)
-        if not text_line:
-            return ["NaN"]
-
-        stripped = text_line.strip()
-        if stripped.startswith('"') and stripped.endswith('"') and len(stripped) >= 2:
-            stripped = stripped[1:-1]
-
-        lines = [entry.strip() for entry in stripped.splitlines() if entry.strip()]
-        data_lines = [entry for entry in lines if "," in entry]
-        if not data_lines:
-            return ["NaN"]
-
-        # For QASM results, skip the first line (energy metrics) and use the second line (voltages)
-        if skip_first and len(data_lines) > 1:
-            data_lines = data_lines[1:]
-
-        target_line = data_lines[-1] if prefer_last else data_lines[0]
-        voltages = [value.strip() for value in re.split(r",\s*", target_line) if value.strip()]
-        return voltages if voltages else ["NaN"]
-
-    @staticmethod
-    def _process_voltage_line(line):
-        return _DynexSampler._extract_voltage_values(line, prefer_last=False)
-
-    @staticmethod
-    def _ensure_voltage_text(line):
-        if not line:
-            return ""
-        if isinstance(line, str):
-            return line
-
-        data = bytes(line)
-        if data.startswith(b"\x28\xb5/\xfd"):
-            try:
-                data = _DynexSampler._decompress_bytes(data, "zstd")
-            except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
-                raise ModuleNotFoundError("zstandard is required to decode zstd-compressed solution results") from exc
-
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError:
-            return data.decode("utf-8", errors="ignore")
+    _extract_voltage_values = staticmethod(extract_voltage_values)
+    _process_voltage_line = staticmethod(process_voltage_line)
+    _ensure_voltage_text = staticmethod(ensure_voltage_text)
 
     def _sample(
         self,
