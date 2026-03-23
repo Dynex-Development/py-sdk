@@ -217,7 +217,7 @@ def test_simple_bqm_all_backends(sdk_credentials, run_integration_tests, backend
     sampler = dynex.DynexSampler(model, config=config)
 
     # Sample with backend-specific parameters
-    kwargs = {"num_reads": 10, "annealing_time": 100}
+    kwargs = {"num_reads": 32 if backend in ["cpu", "gpu"] else 10, "annealing_time": 100}
 
     if backend == "qpu":
         kwargs["qpu_max_coeff"] = 9.0
@@ -533,7 +533,7 @@ def test_cqm_all_backends(sdk_credentials, run_integration_tests, backend):
     sampler = dynex.DynexSampler(model, config=config)
 
     # Sample
-    num_reads = 20 if backend in ["cpu", "gpu"] else 1
+    num_reads = 32 if backend in ["cpu", "gpu"] else 1
     annealing_time = 500 if backend == "cpu" else (1000 if backend == "gpu" else 100)
     sampleset = sampler.sample(num_reads=num_reads, annealing_time=annealing_time)
 
