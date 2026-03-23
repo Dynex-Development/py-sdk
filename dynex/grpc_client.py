@@ -416,10 +416,8 @@ class DynexGrpcClient:
             except grpc.RpcError as e:
                 details = (e.details() or "").lower()
                 if e.code() == grpc.StatusCode.INVALID_ARGUMENT and "unsupported payload" in details:
-                    self._log_warning(
-                        "Server does not accept job_data (legacy QRE); falling back to WCNF chunk upload"
-                    )
-                    return self._create_job_via_wcnf_chunks(
+                    self._log_warning("Server does not accept job_data (legacy QRE); falling back to WCNF chunk upload")
+                    return self._creatmake_job_via_wcnf_chunks(
                         opts, rows, cols, vals, offset, num_vars, job_filename, retry_count
                     )
                 last_exception = e
