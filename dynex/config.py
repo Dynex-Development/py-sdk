@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import ClassVar, List, Optional, Union
 
 from .compute_backend import ComputeBackend
+from .exceptions import DynexValidationError
 from .qpu_models import QPUModel
 
 # Try to import python-dotenv, but make it optional
@@ -87,6 +88,7 @@ class DynexConfig:
         default_timeout: float = 300.0,
         default_description: str = "Dynex SDK Job",
         preserve_solutions: bool = False,
+        debug_save_solutions: bool = False,
     ) -> None:
         self.logger = self._init_logger()
         self.retry_count = retry_count
@@ -95,6 +97,7 @@ class DynexConfig:
         self.default_timeout = default_timeout
         self.default_description = default_description
         self.preserve_solutions = preserve_solutions
+        self.debug_save_solutions = debug_save_solutions
 
         # Validate and normalize compute_backend
         if isinstance(compute_backend, ComputeBackend):
@@ -103,10 +106,12 @@ class DynexConfig:
             compute_backend_lower = compute_backend.lower()
             valid_backends = [b.value for b in ComputeBackend]
             if compute_backend_lower not in valid_backends:
-                raise ValueError(f"compute_backend must be one of {valid_backends}, got '{compute_backend}'")
+                raise DynexValidationError(f"compute_backend must be one of {valid_backends}, got '{compute_backend}'")
             self.compute_backend = compute_backend_lower
         else:
-            raise ValueError(f"compute_backend must be ComputeBackend enum or string, got {type(compute_backend)}")
+            raise DynexValidationError(
+                f"compute_backend must be ComputeBackend enum or string, got {type(compute_backend)}"
+            )
 
         # Validate and normalize qpu_model
         if qpu_model is not None:
@@ -116,38 +121,41 @@ class DynexConfig:
                 qpu_model_lower = qpu_model.lower()
                 valid_models = [m.value for m in QPUModel]
                 if qpu_model_lower not in valid_models:
-                    raise ValueError(f"qpu_model must be one of {valid_models}, got '{qpu_model}'")
+                    raise DynexValidationError(f"qpu_model must be one of {valid_models}, got '{qpu_model}'")
                 self.qpu_model = qpu_model_lower
             else:
-                raise ValueError(f"qpu_model must be QPUModel enum or string, got {type(qpu_model)}")
+                raise DynexValidationError(f"qpu_model must be QPUModel enum or string, got {type(qpu_model)}")
         else:
             self.qpu_model = None
 
-        # Validate QPU configuration: qpu_model is required when compute_backend='qpu'
-        is_qpu = self.compute_backend in ("qpu", "QPU")
+        is_qpu = self.compute_backend == "qpu"
         is_local = self.compute_backend == "local"
 
         if is_qpu and self.qpu_model is None:
-            raise ValueError(
+            raise DynexValidationError(
                 "qpu_model is required when compute_backend='qpu'. "
-                "Please specify qpu_model in DynexConfig. "
                 "Available models: apollo_rc1, apollo_10000. "
                 "Example: DynexConfig(compute_backend='qpu', qpu_model='apollo_rc1')"
             )
 
         # LOCAL backend uses local dynexcore binary (offline mode)
         # All other backends (CPU, GPU, QPU, UNSPECIFIED) use network mode
-        if is_local:
-            self.mainnet = False
-        else:
-            self.mainnet = True
 
+        self.mainnet = not is_local
         # Load .env file if available (only once per class)
         self._load_dotenv(dotenv_path)
 
         # Load configuration from parameters, ENV, .env, or defaults
-        self.sdk_key = self._get_config_value(sdk_key, "SDK_KEY", required=True)
+        self.sdk_key = self._get_config_value(sdk_key, "SDK_KEY", required=self.mainnet)
         self.grpc_endpoint = self._get_config_value(grpc_endpoint, "GRPC_ENDPOINT", default=self.DEFAULT_GRPC_ENDPOINT)
+
+        if self.mainnet:
+            self._validate_grpc_endpoint(self.grpc_endpoint)
+
+        if self.default_timeout <= 0:
+            raise DynexValidationError(f"default_timeout must be positive, got {self.default_timeout}")
+        if self.retry_count < 0:
+            raise DynexValidationError(f"retry_count must be non-negative, got {self.retry_count}")
 
         # Resolve solver path for local mode (only for CPU/GPU with testnet)
         if not self.mainnet:
@@ -254,15 +262,35 @@ class DynexConfig:
         if default is not None:
             return default
 
-        # Required but not found
         if required:
-            raise ValueError(
+            raise DynexValidationError(
                 f"Required configuration '{env_key}' not provided. "
                 f"Set {self.ENV_PREFIX}{env_key} environment variable, "
                 f"add it to .env file, or pass as parameter."
             )
 
         return ""
+
+    @staticmethod
+    def _validate_grpc_endpoint(endpoint: str) -> None:
+        """Validate gRPC endpoint format: host:port, with optional scheme."""
+        raw = endpoint
+        for prefix in ("https://", "http://", "grpc://"):
+            if raw.startswith(prefix):
+                raw = raw[len(prefix) :]
+                break
+
+        if ":" not in raw:
+            raise DynexValidationError(f"grpc_endpoint must include a port (host:port), got '{endpoint}'")
+        host, _, port = raw.rpartition(":")
+        if not host:
+            raise DynexValidationError(f"grpc_endpoint has empty host, got '{endpoint}'")
+        try:
+            port_num = int(port)
+        except ValueError:
+            raise DynexValidationError(f"grpc_endpoint port must be numeric, got '{port}' in '{endpoint}'")
+        if not (1 <= port_num <= 65535):
+            raise DynexValidationError(f"grpc_endpoint port out of range (1-65535), got {port_num}")
 
     def _resolve_solver_path(self, solver_path: Optional[str]) -> Optional[str]:
         """Resolve solver path for LOCAL mode. Returns absolute path or None."""
@@ -307,4 +335,5 @@ class DynexConfig:
             "default_timeout": self.default_timeout,
             "default_description": self.default_description,
             "preserve_solutions": self.preserve_solutions,
+            "debug_save_solutions": self.debug_save_solutions,
         }

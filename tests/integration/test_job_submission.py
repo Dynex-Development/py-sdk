@@ -26,7 +26,7 @@ def test_simple_bqm_submission(sdk_credentials, run_integration_tests):
     sampler = dynex.DynexSampler(model, config=config)
 
     # Submit and get results
-    sampleset = sampler.sample(num_reads=1, annealing_time=100)
+    sampleset = sampler.sample(num_reads=32, annealing_time=100)
 
     # Verify results
     assert sampleset is not None
@@ -62,7 +62,7 @@ def test_constrained_quadratic_model(sdk_credentials, run_integration_tests):
     sampler = dynex.DynexSampler(model, config=config)
 
     # Sample
-    sampleset = sampler.sample(num_reads=1, annealing_time=100)
+    sampleset = sampler.sample(num_reads=32, annealing_time=100)
 
     # Verify
     assert sampleset is not None

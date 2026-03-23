@@ -66,8 +66,7 @@ dmypy.json
 # Runtime solver files
 tmp/
 
-# Platform-specific solver binary
-testnet/dynexcore
+
 
 # Test cache
 .cache/

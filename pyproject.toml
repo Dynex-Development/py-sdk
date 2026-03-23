@@ -51,6 +51,7 @@ dev = [
 
 [tool.setuptools]
 packages = ["dynex", "dynex.interfaces", "dynex.models", "dynex.proto"]
+package-data = { "dynex" = ["py.typed"] }
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"

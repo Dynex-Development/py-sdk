@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from dynex.compute_backend import ComputeBackend
 from dynex.config import DynexConfig
+from dynex.exceptions import DynexValidationError
 from dynex.interfaces.api import Job
 
 if TYPE_CHECKING:
@@ -119,7 +120,6 @@ class DynexAPI:
         shots: int = 1,
         rank: int = 1,
         target_energy: float = 0.0,
-        preprocess: bool = False,
         job_metadata: Optional[dict] = None,
     ) -> tuple:
         """Create a new job via gRPC."""
@@ -142,7 +142,6 @@ class DynexAPI:
             population_size=num_reads,
             rank=rank,
             compute_backend=compute_backend,
-            preprocess=preprocess,
             job_metadata=job_metadata,
         )
 
@@ -161,6 +160,118 @@ class DynexAPI:
         return self._get_grpc_client().create_job(
             opts=opts,
             file_zip=file_zip,
+            job_filename=sampler.filename,
+            retry_count=self.config.retry_count,
+        )
+
+    def create_job_api_proto(
+        self,
+        sampler: "DynexSampler",  # noqa: F821
+        annealing_time: int,
+        switchfraction: int,
+        num_reads: int,
+        alpha: int = 20,
+        beta: int = 20,
+        gamma: int = 1,
+        delta: int = 1,
+        epsilon: int = 1,
+        zeta: int = 1,
+        minimum_stepsize: float = 0.05,
+        block_fee: int = 0,
+        shots: int = 1,
+        rank: int = 1,
+        target_energy: float = 0.0,
+        job_metadata: Optional[dict] = None,
+        debugging: bool = False,
+    ) -> tuple:
+        """Create a new job via structured protobuf message (no file I/O on the hot path).
+
+        Falls back to the file-based path for:
+        - QASM-type samplers (require backend circuit conversion)
+        - Cluster mode (multiple sub-jobs, handled separately)
+        """
+        if not self.config.mainnet:
+            raise NotImplementedError("Job creation is only available in network mode")
+
+        # Cluster and QASM paths still use file-based transport
+        if sampler.type == "qasm" or isinstance(sampler.clauses, list):
+            return self.create_job_api(
+                sampler=sampler,
+                annealing_time=annealing_time,
+                switchfraction=switchfraction,
+                num_reads=num_reads,
+                alpha=alpha,
+                beta=beta,
+                gamma=gamma,
+                delta=delta,
+                epsilon=epsilon,
+                zeta=zeta,
+                minimum_stepsize=minimum_stepsize,
+                block_fee=block_fee,
+                shots=shots,
+                rank=rank,
+                target_energy=target_energy,
+                job_metadata=job_metadata,
+            )
+
+        qubo, offset = sampler.clauses
+        var_mappings = sampler.var_mappings  # {new_int: original_label}
+        num_vars = sampler.num_variables
+
+        # Build index arrays matching _save_wcnf's output exactly.
+        # var_mappings maps new_int → original_label; invert it once for O(1) per-entry lookup.
+        inv_mappings: dict = {mv: k for k, mv in var_mappings.items()} if var_mappings else {}
+
+        rows: list = []
+        cols: list = []
+        vals: list = []
+        for (i, j), v in qubo.items():
+            rows.append(int(inv_mappings.get(i, i)))
+            cols.append(int(inv_mappings.get(j, j)))
+            vals.append(float(v))
+
+        if debugging:
+            import os
+
+            os.makedirs(sampler.filepath, exist_ok=True)
+            sampler._save_wcnf(
+                sampler.clauses,
+                sampler.filepath + sampler.filename,
+                num_vars,
+                sampler.num_clauses,
+                var_mappings,
+            )
+            if self.logger:
+                self.logger.debug(f"[debug] job file: {sampler.filepath + sampler.filename}")
+
+        target_energy_float = float(target_energy) if hasattr(target_energy, "item") else float(target_energy)
+        compute_backend = getattr(sampler.config, "compute_backend", "unspecified")
+
+        opts = JobOptions(
+            annealing_time=annealing_time,
+            switchfraction=switchfraction,
+            num_reads=num_reads,
+            params=[alpha, beta, gamma, delta, epsilon, zeta],
+            min_step_size=minimum_stepsize,
+            description=sampler.description,
+            block_fee=block_fee,
+            shots=shots,
+            target_energy=target_energy_float,
+            population_size=num_reads,
+            rank=rank,
+            compute_backend=compute_backend,
+            job_metadata=job_metadata,
+        )
+
+        if self.logger:
+            self.logger.info("Submitting the job to Dynex.")
+        return self._get_grpc_client().create_job_from_data(
+            opts=opts,
+            rows=rows,
+            cols=cols,
+            vals=vals,
+            offset=float(offset),
+            num_vars=num_vars,
             job_filename=sampler.filename,
             retry_count=self.config.retry_count,
         )
@@ -188,7 +299,6 @@ class JobOptions(BaseModel):
         default="unspecified", description="Compute backend type: 'unspecified', 'cpu', 'gpu', or 'qpu'"
     )
     request_ip: str = Field(default="", description="Request IP address")
-    preprocess: bool = Field(default=False, description="Enable CPU preprocessing before QPU execution")
     job_metadata: Optional[dict] = Field(
         default=None, description="Job metadata: {'type': 'qasm'} for Circuit BQM, None for Constraint BQM"
     )
@@ -213,7 +323,7 @@ class JobOptions(BaseModel):
             v_lower = v.lower()
             valid_values = ["unspecified", "cpu", "gpu", "qpu"]
             if v_lower not in valid_values:
-                raise ValueError(f"compute_backend must be one of {valid_values}, got '{v}'")
+                raise DynexValidationError(f"compute_backend must be one of {valid_values}, got '{v}'")
             return v_lower
         return "unspecified"
 

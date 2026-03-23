@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from dynex.proto import sdk_pb2 as pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2
+from dynex.proto import sdk_pb2 as sdk_dot_v2_dot_sdk__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in pkg/proto/sdk/v2/sdk_pb2_grpc.py depends on'
+        + ' but the generated code in sdk/v2/sdk_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,43 +36,43 @@ class SDKStub(object):
         """
         self.CreateJob = channel.stream_unary(
                 '/dynex.sdk.v2.SDK/CreateJob',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CreateJobRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CreateJobReply.FromString,
+                request_serializer=sdk_dot_v2_dot_sdk__pb2.CreateJobRequest.SerializeToString,
+                response_deserializer=sdk_dot_v2_dot_sdk__pb2.CreateJobReply.FromString,
                 _registered_method=True)
         self.EstimateJob = channel.unary_unary(
                 '/dynex.sdk.v2.SDK/EstimateJob',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.EstimateJobRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.EstimateJobReply.FromString,
+                request_serializer=sdk_dot_v2_dot_sdk__pb2.EstimateJobRequest.SerializeToString,
+                response_deserializer=sdk_dot_v2_dot_sdk__pb2.EstimateJobReply.FromString,
                 _registered_method=True)
         self.CancelJob = channel.unary_unary(
                 '/dynex.sdk.v2.SDK/CancelJob',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CancelJobRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CancelJobReply.FromString,
+                request_serializer=sdk_dot_v2_dot_sdk__pb2.CancelJobRequest.SerializeToString,
+                response_deserializer=sdk_dot_v2_dot_sdk__pb2.CancelJobReply.FromString,
                 _registered_method=True)
         self.FinishJob = channel.unary_unary(
                 '/dynex.sdk.v2.SDK/FinishJob',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.FinishJobRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.FinishJobReply.FromString,
+                request_serializer=sdk_dot_v2_dot_sdk__pb2.FinishJobRequest.SerializeToString,
+                response_deserializer=sdk_dot_v2_dot_sdk__pb2.FinishJobReply.FromString,
                 _registered_method=True)
         self.UpdateJob = channel.unary_unary(
                 '/dynex.sdk.v2.SDK/UpdateJob',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.UpdateJobRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.UpdateJobReply.FromString,
+                request_serializer=sdk_dot_v2_dot_sdk__pb2.UpdateJobRequest.SerializeToString,
+                response_deserializer=sdk_dot_v2_dot_sdk__pb2.UpdateJobReply.FromString,
                 _registered_method=True)
         self.SubscribeJob = channel.unary_stream(
                 '/dynex.sdk.v2.SDK/SubscribeJob',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.SubscribeJobRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.JobEvent.FromString,
+                request_serializer=sdk_dot_v2_dot_sdk__pb2.SubscribeJobRequest.SerializeToString,
+                response_deserializer=sdk_dot_v2_dot_sdk__pb2.JobEvent.FromString,
                 _registered_method=True)
-        self.ListSolutions = channel.unary_unary(
-                '/dynex.sdk.v2.SDK/ListSolutions',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsReply.FromString,
+        self.DownloadSolution = channel.unary_stream(
+                '/dynex.sdk.v2.SDK/DownloadSolution',
+                request_serializer=sdk_dot_v2_dot_sdk__pb2.DownloadSolutionRequest.SerializeToString,
+                response_deserializer=sdk_dot_v2_dot_sdk__pb2.SolutionChunk.FromString,
                 _registered_method=True)
         self.ListAtomics = channel.unary_unary(
                 '/dynex.sdk.v2.SDK/ListAtomics',
-                request_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListAtomicsRequest.SerializeToString,
-                response_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListAtomicsReply.FromString,
+                request_serializer=sdk_dot_v2_dot_sdk__pb2.ListAtomicsRequest.SerializeToString,
+                response_deserializer=sdk_dot_v2_dot_sdk__pb2.ListAtomicsReply.FromString,
                 _registered_method=True)
 
 
@@ -117,7 +117,7 @@ class SDKServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def ListSolutions(self, request, context):
+    def DownloadSolution(self, request, context):
         """Solutions
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -136,43 +136,43 @@ def add_SDKServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'CreateJob': grpc.stream_unary_rpc_method_handler(
                     servicer.CreateJob,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CreateJobRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CreateJobReply.SerializeToString,
+                    request_deserializer=sdk_dot_v2_dot_sdk__pb2.CreateJobRequest.FromString,
+                    response_serializer=sdk_dot_v2_dot_sdk__pb2.CreateJobReply.SerializeToString,
             ),
             'EstimateJob': grpc.unary_unary_rpc_method_handler(
                     servicer.EstimateJob,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.EstimateJobRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.EstimateJobReply.SerializeToString,
+                    request_deserializer=sdk_dot_v2_dot_sdk__pb2.EstimateJobRequest.FromString,
+                    response_serializer=sdk_dot_v2_dot_sdk__pb2.EstimateJobReply.SerializeToString,
             ),
             'CancelJob': grpc.unary_unary_rpc_method_handler(
                     servicer.CancelJob,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CancelJobRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CancelJobReply.SerializeToString,
+                    request_deserializer=sdk_dot_v2_dot_sdk__pb2.CancelJobRequest.FromString,
+                    response_serializer=sdk_dot_v2_dot_sdk__pb2.CancelJobReply.SerializeToString,
             ),
             'FinishJob': grpc.unary_unary_rpc_method_handler(
                     servicer.FinishJob,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.FinishJobRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.FinishJobReply.SerializeToString,
+                    request_deserializer=sdk_dot_v2_dot_sdk__pb2.FinishJobRequest.FromString,
+                    response_serializer=sdk_dot_v2_dot_sdk__pb2.FinishJobReply.SerializeToString,
             ),
             'UpdateJob': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateJob,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.UpdateJobRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.UpdateJobReply.SerializeToString,
+                    request_deserializer=sdk_dot_v2_dot_sdk__pb2.UpdateJobRequest.FromString,
+                    response_serializer=sdk_dot_v2_dot_sdk__pb2.UpdateJobReply.SerializeToString,
             ),
             'SubscribeJob': grpc.unary_stream_rpc_method_handler(
                     servicer.SubscribeJob,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.SubscribeJobRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.JobEvent.SerializeToString,
+                    request_deserializer=sdk_dot_v2_dot_sdk__pb2.SubscribeJobRequest.FromString,
+                    response_serializer=sdk_dot_v2_dot_sdk__pb2.JobEvent.SerializeToString,
             ),
-            'ListSolutions': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListSolutions,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsReply.SerializeToString,
+            'DownloadSolution': grpc.unary_stream_rpc_method_handler(
+                    servicer.DownloadSolution,
+                    request_deserializer=sdk_dot_v2_dot_sdk__pb2.DownloadSolutionRequest.FromString,
+                    response_serializer=sdk_dot_v2_dot_sdk__pb2.SolutionChunk.SerializeToString,
             ),
             'ListAtomics': grpc.unary_unary_rpc_method_handler(
                     servicer.ListAtomics,
-                    request_deserializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListAtomicsRequest.FromString,
-                    response_serializer=pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListAtomicsReply.SerializeToString,
+                    request_deserializer=sdk_dot_v2_dot_sdk__pb2.ListAtomicsRequest.FromString,
+                    response_serializer=sdk_dot_v2_dot_sdk__pb2.ListAtomicsReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -200,8 +200,8 @@ class SDK(object):
             request_iterator,
             target,
             '/dynex.sdk.v2.SDK/CreateJob',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CreateJobRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CreateJobReply.FromString,
+            sdk_dot_v2_dot_sdk__pb2.CreateJobRequest.SerializeToString,
+            sdk_dot_v2_dot_sdk__pb2.CreateJobReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -227,8 +227,8 @@ class SDK(object):
             request,
             target,
             '/dynex.sdk.v2.SDK/EstimateJob',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.EstimateJobRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.EstimateJobReply.FromString,
+            sdk_dot_v2_dot_sdk__pb2.EstimateJobRequest.SerializeToString,
+            sdk_dot_v2_dot_sdk__pb2.EstimateJobReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -254,8 +254,8 @@ class SDK(object):
             request,
             target,
             '/dynex.sdk.v2.SDK/CancelJob',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CancelJobRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.CancelJobReply.FromString,
+            sdk_dot_v2_dot_sdk__pb2.CancelJobRequest.SerializeToString,
+            sdk_dot_v2_dot_sdk__pb2.CancelJobReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -281,8 +281,8 @@ class SDK(object):
             request,
             target,
             '/dynex.sdk.v2.SDK/FinishJob',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.FinishJobRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.FinishJobReply.FromString,
+            sdk_dot_v2_dot_sdk__pb2.FinishJobRequest.SerializeToString,
+            sdk_dot_v2_dot_sdk__pb2.FinishJobReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -308,8 +308,8 @@ class SDK(object):
             request,
             target,
             '/dynex.sdk.v2.SDK/UpdateJob',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.UpdateJobRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.UpdateJobReply.FromString,
+            sdk_dot_v2_dot_sdk__pb2.UpdateJobRequest.SerializeToString,
+            sdk_dot_v2_dot_sdk__pb2.UpdateJobReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -335,8 +335,8 @@ class SDK(object):
             request,
             target,
             '/dynex.sdk.v2.SDK/SubscribeJob',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.SubscribeJobRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.JobEvent.FromString,
+            sdk_dot_v2_dot_sdk__pb2.SubscribeJobRequest.SerializeToString,
+            sdk_dot_v2_dot_sdk__pb2.JobEvent.FromString,
             options,
             channel_credentials,
             insecure,
@@ -348,7 +348,7 @@ class SDK(object):
             _registered_method=True)
 
     @staticmethod
-    def ListSolutions(request,
+    def DownloadSolution(request,
             target,
             options=(),
             channel_credentials=None,
@@ -358,12 +358,12 @@ class SDK(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(
+        return grpc.experimental.unary_stream(
             request,
             target,
-            '/dynex.sdk.v2.SDK/ListSolutions',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListSolutionsReply.FromString,
+            '/dynex.sdk.v2.SDK/DownloadSolution',
+            sdk_dot_v2_dot_sdk__pb2.DownloadSolutionRequest.SerializeToString,
+            sdk_dot_v2_dot_sdk__pb2.SolutionChunk.FromString,
             options,
             channel_credentials,
             insecure,
@@ -389,8 +389,8 @@ class SDK(object):
             request,
             target,
             '/dynex.sdk.v2.SDK/ListAtomics',
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListAtomicsRequest.SerializeToString,
-            pkg_dot_proto_dot_sdk_dot_v2_dot_sdk__pb2.ListAtomicsReply.FromString,
+            sdk_dot_v2_dot_sdk__pb2.ListAtomicsRequest.SerializeToString,
+            sdk_dot_v2_dot_sdk__pb2.ListAtomicsReply.FromString,
             options,
             channel_credentials,
             insecure,

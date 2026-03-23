@@ -130,7 +130,7 @@ def test_nqueens_example(sdk_credentials, run_integration_tests, backend, n):
 
     # Sample from nqueens_demo.py
     kwargs = {
-        "num_reads": 10 if backend in ["cpu", "gpu"] else 1,
+        "num_reads": 32 if backend in ["cpu", "gpu"] else 1,
         "annealing_time": 1000 if backend in ["cpu", "gpu"] else 100,
     }
     if backend == "qpu":
@@ -227,7 +227,7 @@ def test_tsp_example(sdk_credentials, run_integration_tests, backend):
 
     # Sample
     kwargs = {
-        "num_reads": 10 if backend in ["cpu", "gpu"] else 1,
+        "num_reads": 32 if backend in ["cpu", "gpu"] else 1,
         "annealing_time": 1000 if backend in ["cpu", "gpu"] else 100,
     }
     if backend == "qpu":

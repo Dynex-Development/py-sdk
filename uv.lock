@@ -672,6 +672,7 @@ name = "dynex"
 source = { editable = "." }
 dependencies = [
     { name = "dimod" },
+    { name = "gast" },
     { name = "grpcio" },
     { name = "ipython" },
     { name = "numpy" },
@@ -706,6 +707,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "dimod", specifier = ">=0.10.17" },
+    { name = "gast" },
     { name = "grpcio", specifier = ">=1.62" },
     { name = "ipython", specifier = ">=8.0" },
     { name = "numpy", specifier = ">=2.0" },

@@ -33,6 +33,7 @@ import dimod
 import numpy as np
 
 from dynex.config import DynexConfig
+from dynex.exceptions import DynexModelError
 
 
 @dataclass
@@ -79,7 +80,7 @@ class DynexModel(ABC):
         max_abs_coeff = max(linear_max, quadratic_max)
 
         if max_abs_coeff == 0:
-            raise Exception("At least one weight must be > 0.0")
+            raise DynexModelError("At least one weight must be > 0.0")
         precision = 10 ** (np.floor(np.log10(max_abs_coeff)) - 4)
         return precision
 
@@ -100,7 +101,7 @@ class DynexModel(ABC):
         if max_abs_coeff == 0:
             if self.logger:
                 self.logger.error("At least one weight must be > 0.0")
-            raise Exception("At least one weight must be > 0.0")
+            raise DynexModelError("At least one weight must be > 0.0")
 
         precision = 10 ** (np.floor(np.log10(max_abs_coeff)) - 4)
 

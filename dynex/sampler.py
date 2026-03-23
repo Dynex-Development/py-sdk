@@ -27,21 +27,19 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import ast
-import io
 import json
 import logging
 import math
 import multiprocessing
 import os
 import queue
-import re
 import secrets
 import subprocess
 import threading
 import time
 import zlib
 from dataclasses import dataclass, field
-from typing import NamedTuple, Optional
+from typing import Optional
 
 import dimod
 import neal
@@ -54,8 +52,25 @@ try:
 except ModuleNotFoundError:
     grpc = None  # type: ignore
 
+from dynex._solution_parser import (
+    SolutionMetrics,
+    coerce_float,
+    coerce_int,
+    decode_varint,
+    decompress_bytes,
+    extract_solution_stats,
+    parse_solution_numbers,
+    parse_solution_subject,
+    protobuf_has_field,
+    sanitize_solution_name,
+    skip_field,
+    skip_group,
+    solution_metrics_from_filename,
+)
+from dynex._voltage import ensure_voltage_text, extract_voltage_values, process_voltage_line
 from dynex.api import DynexAPI
 from dynex.config import DynexConfig
+from dynex.exceptions import DynexJobError, DynexModelError, DynexValidationError
 from dynex.models import BQM
 from dynex.proto import sdk_pb2
 
@@ -63,13 +78,6 @@ try:
     import zstandard as zstd
 except ModuleNotFoundError:
     zstd = None  # type: ignore
-
-
-class SolutionMetrics(NamedTuple):
-    chips: int
-    steps: int
-    loc: int
-    energy: float
 
 
 @dataclass
@@ -210,11 +218,11 @@ class DynexSampler:
 
         # assert parameters:
         if clones < 1:
-            raise Exception("Value of clones must be in range [1,128]")
+            raise DynexValidationError("Value of clones must be in range [1,128]")
         if clones > 128:
-            raise Exception("Value of clones must be in range [1,128]")
+            raise DynexValidationError("Value of clones must be in range [1,128]")
         if not self.config.mainnet and clones > 1:
-            raise Exception("Clone sampling is only supported in network mode")
+            raise DynexValidationError("Clone sampling is only supported in network mode")
 
         # Apollo QPU limitation: annealing_time cannot exceed 10000
         MAX_ANNEALING_TIME_QPU = 10000
@@ -365,8 +373,8 @@ class _DynexSampler:
         job_metadata: Optional[dict] = None,
     ):
 
-        if model.type not in ["cnf", "wcnf", "qasm"]:
-            raise Exception("INCORRECT MODEL TYPE:", model.type)
+        if model.type not in ("cnf", "wcnf", "qasm"):
+            raise DynexModelError(f"Unsupported model type: {model.type}")
 
         self.config = config if config is not None else DynexConfig()
         self.description = description if description is not None else self.config.default_description
@@ -397,6 +405,7 @@ class _DynexSampler:
         self._grpc_solution_stats = {}
         self._grpc_solution_remote = {}
         self._grpc_downloaded_files = set()
+        self._solution_cache: dict = {}
         self.preserve_solutions = (
             preserve_solutions if preserve_solutions is not None else self.config.preserve_solutions
         )
@@ -409,9 +418,9 @@ class _DynexSampler:
 
         # multi-model parallel sampling?
         multi_model_mode = False
-        if isinstance(model, list) and not self.config.mainnet:
+        if isinstance(model, list):
             if not self.config.mainnet:
-                raise Exception("Multi model parallel sampling is only supported in network mode")
+                raise DynexValidationError("Multi model parallel sampling is only supported in network mode")
             multi_model_mode = True
 
         self.multi_model_mode = multi_model_mode
@@ -438,9 +447,14 @@ class _DynexSampler:
                 self.clauses = model.bqm.to_qubo()
                 self.var_mappings = model.var_mappings
                 self.precision = model.precision
-                self._save_wcnf(
-                    self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses, self.var_mappings
-                )
+                if not self.config.mainnet:
+                    self._save_wcnf(
+                        self.clauses,
+                        self.filepath + self.filename,
+                        self.num_variables,
+                        self.num_clauses,
+                        self.var_mappings,
+                    )
 
             elif model.type == "qasm":
                 self.clauses = [0, -9999999999]
@@ -478,13 +492,14 @@ class _DynexSampler:
                     _clauses.append(m.bqm.to_qubo())
                     _var_mappings.append(m.var_mappings)
                     _precision.append(m.precision)
-                    self._save_wcnf(
-                        _clauses[-1],
-                        self.filepath + _filename[-1],
-                        _num_variables[-1],
-                        _num_clauses[-1],
-                        _var_mappings[-1],
-                    )
+                    if not self.config.mainnet:
+                        self._save_wcnf(
+                            _clauses[-1],
+                            self.filepath + _filename[-1],
+                            _num_variables[-1],
+                            _num_clauses[-1],
+                            _var_mappings[-1],
+                        )
                 _type.append(m.type)
                 _assignments.append({})
                 _dimod_assignments.append({})
@@ -615,7 +630,10 @@ class _DynexSampler:
         return
 
     def list_files_with_text_local(self):
-        """List assignment files in tmp directory for current model."""
+        """List available solution keys (in-memory for mainnet, files for local solver)."""
+        if self.config.mainnet:
+            return list(self._solution_cache.keys())
+
         directory = self.filepath_full
         fn = self.filename + "."
         filtered_files = []
@@ -624,9 +642,6 @@ class _DynexSampler:
             if filename.startswith(fn) and not filename.endswith("model"):
                 if os.path.getsize(os.path.join(directory, filename)) > 0:
                     filtered_files.append(filename)
-
-        if self.config.mainnet:
-            filtered_files = [name for name in filtered_files if name in self._grpc_downloaded_files]
 
         return filtered_files
 
@@ -666,6 +681,7 @@ class _DynexSampler:
         self._job_error = None
         self._grpc_solution_remote = {}
         self._grpc_downloaded_files = set()
+        self._solution_cache = {}
 
     def _ensure_grpc_subscription(self):
         if self._grpc_subscription_disabled:
@@ -930,94 +946,92 @@ class _DynexSampler:
             if self.logging:
                 self.logger.warning(f"Local path too long, using hash-based name: {local_name}")
 
-        if os.path.isfile(local_path) and os.path.getsize(local_path) > 0:
-            self._downloaded_solutions.add(remote_name)
-            self._log_debug(f"Solution already present locally name={remote_name} path={local_path}")
-            return
+        # Check if already received (cache for mainnet, file for local solver)
+        if self.config.mainnet:
+            if local_name in self._solution_cache:
+                self._downloaded_solutions.add(remote_name)
+                self._log_debug(f"Solution already in cache name={remote_name} key={local_name}")
+                return
+        else:
+            if os.path.isfile(local_path) and os.path.getsize(local_path) > 0:
+                self._downloaded_solutions.add(remote_name)
+                self._log_debug(f"Solution already present locally name={remote_name} path={local_path}")
+                return
 
-        # Support both inline and presigned URL delivery (if backend supports both)
-        downloaded = False
+        raw_data: bytes | None = None
 
-        # Check for inline data first (if backend supports it and kind == "inline")
+        # Decode inline data (kind == "inline")
         if inline_data and kind == "inline":
             try:
                 self._log_debug(
                     f"Processing inline solution data name={remote_name} kind={kind} data_len={len(inline_data)}"
                 )
-                if self.logging:
-                    self.logger.debug(
-                        f"Processing inline solution: name={remote_name}, "
-                        f"data_len={len(inline_data)}, compression={compression_hint}"
-                    )
                 import base64
 
-                # Decode base64
                 try:
                     compressed_data = base64.b64decode(inline_data)
                 except Exception as decode_exc:
-                    # Try without base64 if it's already raw data
                     if self.logging:
                         self.logger.warning(f"Base64 decode failed, trying raw data: {decode_exc}")
                     compressed_data = inline_data.encode("utf-8") if isinstance(inline_data, str) else inline_data
 
-                # Decompress if needed
-                if compression_hint:
-                    raw_data = self._decompress_bytes(compressed_data, compression_hint)
-                else:
-                    raw_data = compressed_data
-
-                directory = os.path.dirname(local_path)
-                if directory:
-                    os.makedirs(directory, exist_ok=True)
-                with open(local_path, "wb") as fh:
-                    fh.write(raw_data)
-                downloaded = True
-                self._log_debug(f"Inline solution saved name={remote_name} path={local_path} size={len(raw_data)}")
-                if self.logging:
-                    self.logger.debug(
-                        f"Inline solution saved successfully: {remote_name}, " f"file_size={len(raw_data)} bytes"
-                    )
+                raw_data = (
+                    self._decompress_bytes(compressed_data, compression_hint) if compression_hint else compressed_data
+                )
+                self._log_debug(f"Inline solution decoded name={remote_name} size={len(raw_data)}")
             except Exception as exc:
                 if self.logging:
                     self.logger.error(f"Inline data processing error {remote_name}: {exc}", exc_info=True)
                 self._log_debug(f"Inline data processing failed name={remote_name} error={exc}")
 
-        # Use presigned URL (primary method for current backend)
-        if not downloaded and url:
+        # Fetch via presigned URL if inline data was not available
+        if raw_data is None and url:
             try:
                 self._log_debug(f"Downloading solution via presigned URL name={remote_name} url={url[:50]}...")
                 import urllib.request
 
                 with urllib.request.urlopen(url) as response:
-                    raw_data = response.read()
-                    # Decompress if needed
-                    if compression_hint:
-                        raw_data = self._decompress_bytes(raw_data, compression_hint)
-                    directory = os.path.dirname(local_path)
-                    if directory:
-                        os.makedirs(directory, exist_ok=True)
-                    with open(local_path, "wb") as fh:
-                        fh.write(raw_data)
-                downloaded = True
+                    fetched = response.read()
+                raw_data = self._decompress_bytes(fetched, compression_hint) if compression_hint else fetched
             except Exception as exc:
                 if self.logging:
                     self.logger.error(f"Presigned URL download error {remote_name}: {exc}")
                 self._log_debug(f"Presigned URL download failed name={remote_name} error={exc}")
 
-        # Final fallback - if no URL and no inline data, solution is not available
-        if not downloaded:
+        if raw_data is None:
             self._log_debug(
-                f"Solution not available: no URL and no inline data name={remote_name} kind={kind} has_inline={bool(inline_data)} has_url={bool(url)}"
+                f"Solution not available: no URL and no inline data name={remote_name} kind={kind} "
+                f"has_inline={bool(inline_data)} has_url={bool(url)}"
             )
-            # Solutions should come via SubscribeJob streaming with presigned URL
-            # If URL is missing, the solution may not be ready yet or backend error
             return
 
+        # Store solution: in-memory for mainnet, on disk for local solver.
+        # Write to disk only when debug_save_solutions is enabled (debug/analysis).
+        if self.config.mainnet:
+            self._solution_cache[local_name] = raw_data
+            if self.config.debug_save_solutions:
+                try:
+                    os.makedirs(os.path.dirname(local_path) or self.filepath, exist_ok=True)
+                    with open(local_path, "wb") as fh:
+                        fh.write(raw_data)
+                    self._log_debug(f"Debug: solution saved to disk name={remote_name} path={local_path}")
+                except OSError as exc:
+                    if self.logging:
+                        self.logger.warning(f"Debug file write failed {local_path}: {exc}")
+        else:
+            os.makedirs(os.path.dirname(local_path) or self.filepath, exist_ok=True)
+            with open(local_path, "wb") as fh:
+                fh.write(raw_data)
+            self._log_debug(f"Solution saved to disk name={remote_name} path={local_path} size={len(raw_data)}")
+
+        # Validate (currently always returns True; kept for future checks)
         if not self.validate_file(local_name):
-            self._log_debug(f"Solution validation failed name={remote_name} path={local_path}")
+            self._log_debug(f"Solution validation failed name={remote_name}")
             if self.logging:
-                self.logger.warning(f"Solution validation failed for {remote_name}, not adding to downloaded_solutions")
-            if os.path.exists(local_path):
+                self.logger.warning(f"Solution validation failed for {remote_name}, discarding")
+            if self.config.mainnet:
+                self._solution_cache.pop(local_name, None)
+            elif os.path.exists(local_path):
                 os.remove(local_path)
             try:
                 self.api.report_invalid(filename=remote_name, reason="wrong energy reported")
@@ -1028,22 +1042,18 @@ class _DynexSampler:
         self._downloaded_solutions.add(remote_name)
         solutions_count = len(self._downloaded_solutions)
 
-        # Log progress
         if self.logging:
-            self.logger.debug(
-                f"Solution added to downloaded_solutions: {remote_name}, " f"total_count={solutions_count}"
-            )
-            # Show progress on INFO level and track timing
+            self.logger.debug(f"Solution added to downloaded_solutions: {remote_name}, total_count={solutions_count}")
             expected = getattr(self, "expected_shots", None)
             if expected:
                 self.logger.info(f"Shot {solutions_count}/{expected} received")
-                # Track first shot timing
                 timing = getattr(self, "_timing", None)
                 if timing and timing.first_shot is None and solutions_count == 1:
                     timing.first_shot = time.time()
+
         local_basename = os.path.basename(local_path)
-        self._grpc_downloaded_files.add(local_basename)
-        key_candidates = {safe_name, local_basename, remote_name}
+        self._grpc_downloaded_files.add(local_name)
+        key_candidates = {safe_name, local_name, local_basename, remote_name}
         for key in list(key_candidates):
             if not key:
                 continue
@@ -1051,10 +1061,10 @@ class _DynexSampler:
             if stats_copy:
                 self._grpc_solution_stats[key] = dict(stats_copy)
         if stats_copy:
-            self._grpc_solution_stats[local_basename] = dict(stats_copy)
-        self._grpc_solution_meta[local_basename] = solution
+            self._grpc_solution_stats[local_name] = dict(stats_copy)
+        self._grpc_solution_meta[local_name] = solution
         self._log_debug(
-            f"Solution stored name={remote_name} path={local_path} downloaded_count={len(self._downloaded_solutions)}"
+            f"Solution stored name={remote_name} key={local_name} downloaded_count={len(self._downloaded_solutions)}"
         )
 
     def list_files_with_text(self):
@@ -1065,171 +1075,19 @@ class _DynexSampler:
 
         # FTP removed - using gRPC only
 
-    @staticmethod
-    def _sanitize_solution_name(name: str) -> str:
-        if not name:
-            return "solution"
-        sanitized = re.sub(r"[^A-Za-z0-9_.-]", "_", name)
-        return sanitized or "solution"
-
-    @staticmethod
-    def _parse_solution_subject(subject: str) -> dict:
-        if not subject:
-            return {}
-        try:
-            data = json.loads(subject)
-            if isinstance(data, dict):
-                return data
-        except (TypeError, ValueError):
-            pass
-        tokens = re.split(r"[;,]\s*", subject)
-        data: dict[str, str] = {}
-        for token in tokens:
-            if "=" not in token:
-                continue
-            key, value = token.split("=", 1)
-            key = key.strip()
-            value = value.strip()
-            if key:
-                data[key] = value
-        return data
-
-    @staticmethod
-    def _parse_solution_numbers(text: str) -> dict:
-        if not text:
-            return {}
-        matches = re.findall(r"-?\d+(?:\.\d+)?", text)
-        if len(matches) < 4:
-            return {}
-        result: dict[str, float] = {}
-        try:
-            result["chips"] = int(float(matches[0]))
-            result["steps"] = int(float(matches[1]))
-            result["loc"] = int(float(matches[2]))
-            result["energy"] = float(matches[3])
-        except ValueError:
-            return {}
-        return result
+    _sanitize_solution_name = staticmethod(sanitize_solution_name)
+    _parse_solution_subject = staticmethod(parse_solution_subject)
+    _parse_solution_numbers = staticmethod(parse_solution_numbers)
+    _coerce_int = staticmethod(coerce_int)
+    _coerce_float = staticmethod(coerce_float)
+    _decompress_bytes = staticmethod(decompress_bytes)
+    _decode_varint = staticmethod(decode_varint)
+    _skip_field = staticmethod(skip_field)  # type: ignore[assignment]
+    _skip_group = staticmethod(skip_group)  # type: ignore[assignment]
+    _protobuf_has_field = staticmethod(protobuf_has_field)
 
     def _extract_solution_stats(self, solution, remote_name: str) -> dict:
-        subject = getattr(solution, "subject", "")
-        subject_stats_raw = self._parse_solution_subject(subject)
-        subject_stats = dict(subject_stats_raw) if subject_stats_raw else {}
-        stats: dict[str, object] = {}
-        if subject_stats:
-            stats.update(subject_stats)
-            data_field = subject_stats.get("data") or subject_stats.get("payload") or subject_stats.get("inline_data")
-            if data_field:
-                stats["inline_data"] = data_field
-        numeric_stats = {}
-        for key in ("chips", "steps", "loc", "energy"):
-            if key in stats:
-                continue
-            value = subject_stats.get(key)
-            if value is None:
-                continue
-            numeric_stats[key] = value
-        if not numeric_stats:
-            numeric_stats = self._parse_solution_numbers(remote_name)
-        stats.update(numeric_stats)
-        # Clean up any legacy fields
-        if subject_stats:
-            subject_stats = dict(subject_stats)
-            subject_stats.pop("data", None)
-            subject_stats.pop("payload", None)
-        stats["subject_dict"] = subject_stats
-        return stats
-
-    @staticmethod
-    def _coerce_int(value):
-        if value is None or value == "":
-            return None
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            try:
-                return int(float(value))
-            except (TypeError, ValueError):
-                return None
-
-    @staticmethod
-    def _coerce_float(value):
-        if value is None or value == "":
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
-    @staticmethod
-    def _decompress_bytes(data: bytes, compression: str | None) -> bytes:
-        if not compression:
-            return data
-        compression = compression.lower()
-        if compression == "zstd":
-            if zstd is None:
-                raise ModuleNotFoundError("zstandard is required to decode zstd-compressed solutions")
-            decompressor = zstd.ZstdDecompressor()
-            try:
-                return decompressor.decompress(data)
-            except zstd.ZstdError:
-                with decompressor.stream_reader(io.BytesIO(data)) as reader:
-                    return reader.read()
-        return data
-
-    @staticmethod
-    def _decode_varint(buffer: bytes, index: int) -> tuple[int, int]:
-        result = 0
-        shift = 0
-        while True:
-            if index >= len(buffer):
-                raise ValueError("truncated varint while decoding solution payload")
-            byte = buffer[index]
-            index += 1
-            result |= (byte & 0x7F) << shift
-            if not (byte & 0x80):
-                return result, index
-            shift += 7
-            if shift >= 64:
-                raise ValueError("varint overflow while decoding solution payload")
-
-    @classmethod
-    def _skip_field(cls, buffer: bytes, index: int, wire_type: int) -> int:
-        if wire_type == 0:
-            _, index = cls._decode_varint(buffer, index)
-        elif wire_type == 1:
-            index += 8
-        elif wire_type == 2:
-            length, index = cls._decode_varint(buffer, index)
-            index += length
-        elif wire_type == 3:
-            index = cls._skip_group(buffer, index)
-        elif wire_type == 4:
-            pass
-        elif wire_type == 5:
-            index += 4
-        else:
-            raise ValueError(f"unknown wire type {wire_type} while decoding solution payload")
-        return index
-
-    @classmethod
-    def _skip_group(cls, buffer: bytes, index: int) -> int:
-        while True:
-            tag, index = cls._decode_varint(buffer, index)
-            wire_type = tag & 0x7
-            if wire_type == 4:
-                return index
-            index = cls._skip_field(buffer, index, wire_type)
-
-    @staticmethod
-    def _protobuf_has_field(message, field_name: str) -> bool:
-        descriptor = getattr(message, "DESCRIPTOR", None)
-        if descriptor is None or field_name not in descriptor.fields_by_name:
-            return False
-        try:
-            return message.HasField(field_name)
-        except ValueError:
-            return False
+        return extract_solution_stats(solution, remote_name)
 
     def _lookup_grpc_stats(self, filename: str, info: str) -> dict:
         stats = self._grpc_solution_stats.get(filename, {})
@@ -1242,35 +1100,14 @@ class _DynexSampler:
         return stats
 
     def _solution_metrics_from_filename(self, filename: str, fallback_info: str, stats: dict) -> SolutionMetrics:
-        chips = self._coerce_int(stats.get("chips")) if stats else None
-        steps = self._coerce_int(stats.get("steps")) if stats else None
-        loc = self._coerce_int(stats.get("loc")) if stats else None
-        energy = self._coerce_float(stats.get("energy")) if stats else None
-
-        if chips is None or steps is None or loc is None or energy is None:
-            parsed = self._parse_solution_numbers(fallback_info)
-            if chips is None:
-                chips = parsed.get("chips")
-            if steps is None:
-                steps = parsed.get("steps")
-            if loc is None:
-                loc = parsed.get("loc")
-            if energy is None:
-                energy = parsed.get("energy")
-
-        return SolutionMetrics(
-            chips=self._coerce_int(chips) or 0,
-            steps=self._coerce_int(steps) or 0,
-            loc=self._coerce_int(loc) or 0,
-            energy=self._coerce_float(energy) or 0.0,
-        )
+        return solution_metrics_from_filename(filename, fallback_info, stats)
 
     def _get_solution_metrics(self, filename: str) -> SolutionMetrics:
         info = filename[len(self.filename) + 1 :]
         stats = {}
         if self.config.mainnet:
             stats = self._lookup_grpc_stats(filename, info)
-        return self._solution_metrics_from_filename(filename, info, stats)
+        return solution_metrics_from_filename(filename, info, stats)
 
     def _list_files_with_text_ftp(self):
         """FTP method removed - using gRPC only"""
@@ -1353,7 +1190,10 @@ class _DynexSampler:
             self.clauses = model.to_qubo()
             self.var_mappings = model.var_mappings
             self.precision = model.precision
-            self._save_wcnf(self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses)
+            if not self.config.mainnet:
+                self._save_wcnf(
+                    self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses, self.var_mappings
+                )
 
         self.type = model.type
         self.assignments = {}
@@ -1361,7 +1201,24 @@ class _DynexSampler:
         self.bqm = model.bqm
 
     def delete_local_files_by_prefix(self, directory: str, prefix: str):
-        for filename in os.listdir(directory):
+        if self.config.mainnet:
+            keys = [k for k in self._solution_cache if k.startswith(prefix)]
+            for k in keys:
+                del self._solution_cache[k]
+            if keys:
+                self._log_debug(f"Cleared {len(keys)} cached solutions prefix={prefix}")
+            if self.config.debug_save_solutions:
+                self._delete_files_by_prefix(directory, prefix)
+            return
+
+        self._delete_files_by_prefix(directory, prefix)
+
+    def _delete_files_by_prefix(self, directory: str, prefix: str):
+        try:
+            entries = os.listdir(directory)
+        except OSError:
+            return
+        for filename in entries:
             if filename.startswith(prefix):
                 file_path = os.path.join(directory, filename)
                 try:
@@ -1452,7 +1309,7 @@ class _DynexSampler:
 
             self.logger.info(f"No valid sample result found. Resampling... {i + 1} / {self.num_retries}")
             self.filename = secrets.token_hex(16) + ".dnx"
-            if self.type == "wcnf":
+            if self.type == "wcnf" and not self.config.mainnet:
                 self._save_wcnf(
                     self.clauses,
                     self.filepath + self.filename,
@@ -1468,14 +1325,21 @@ class _DynexSampler:
         return retval
 
     def read_voltage_data(self, file, mainnet, rank):
+        if mainnet:
+            data = self._solution_cache.get(file)
+            if data is None:
+                self.logger.error(f"Solution not in cache: {file}")
+                return ["NaN"]
+            skip_first = self.type == "qasm"
+            if rank == 1:
+                return self._extract_voltage_values(data, prefer_last=False, skip_first=skip_first)
+            return self._extract_voltage_values(data, prefer_last=(rank > 1), skip_first=skip_first)
+
         file_path = os.path.join(self.filepath, file)
         try:
             with open(file_path, "rb") as ffile:
-                if mainnet and rank == 1:
-                    return self._read_second_line(ffile)
                 prefer_last = rank > 1
                 return self._read_last_non_empty_line(ffile) if prefer_last else self._read_entire_file(ffile)
-
         except (IOError, OSError) as e:
             self.logger.error(f"Error reading file {file_path}: {e}")
             return ["NaN"]
@@ -1498,51 +1362,9 @@ class _DynexSampler:
         skip_first = self.type == "qasm"
         return self._extract_voltage_values(data, prefer_last=False, skip_first=skip_first)
 
-    @staticmethod
-    def _extract_voltage_values(line, prefer_last=False, skip_first=False):
-        text_line = _DynexSampler._ensure_voltage_text(line)
-        if not text_line:
-            return ["NaN"]
-
-        stripped = text_line.strip()
-        if stripped.startswith('"') and stripped.endswith('"') and len(stripped) >= 2:
-            stripped = stripped[1:-1]
-
-        lines = [entry.strip() for entry in stripped.splitlines() if entry.strip()]
-        data_lines = [entry for entry in lines if "," in entry]
-        if not data_lines:
-            return ["NaN"]
-
-        # For QASM results, skip the first line (energy metrics) and use the second line (voltages)
-        if skip_first and len(data_lines) > 1:
-            data_lines = data_lines[1:]
-
-        target_line = data_lines[-1] if prefer_last else data_lines[0]
-        voltages = [value.strip() for value in re.split(r",\s*", target_line) if value.strip()]
-        return voltages if voltages else ["NaN"]
-
-    @staticmethod
-    def _process_voltage_line(line):
-        return _DynexSampler._extract_voltage_values(line, prefer_last=False)
-
-    @staticmethod
-    def _ensure_voltage_text(line):
-        if not line:
-            return ""
-        if isinstance(line, str):
-            return line
-
-        data = bytes(line)
-        if data.startswith(b"\x28\xb5/\xfd"):
-            try:
-                data = _DynexSampler._decompress_bytes(data, "zstd")
-            except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
-                raise ModuleNotFoundError("zstandard is required to decode zstd-compressed solution results") from exc
-
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError:
-            return data.decode("utf-8", errors="ignore")
+    _extract_voltage_values = staticmethod(extract_voltage_values)
+    _process_voltage_line = staticmethod(process_voltage_line)
+    _ensure_voltage_text = staticmethod(ensure_voltage_text)
 
     def _sample(
         self,
@@ -1568,7 +1390,7 @@ class _DynexSampler:
         self._timing = SamplingTiming()
 
         if self.multi_model_mode is True:
-            raise Exception("Multi-model parallel sampling is not implemented yet")
+            raise DynexJobError("Multi-model parallel sampling is not implemented yet")
 
         # Apollo QPU limitation: annealing_time cannot exceed 10000
         MAX_ANNEALING_TIME_QPU = 10000
@@ -1730,11 +1552,12 @@ class _DynexSampler:
                     "shots": shots,
                     "rank": rank,
                     "target_energy": 0.0 - self.clauses[1],
-                    "preprocess": preprocess,  # Pass preprocess to API
                     "job_metadata": job_metadata,  # Automatically set for Circuit BQM
                 }
 
-                job_id, self.filename, price_per_block, qasm = self.api.create_job_api(**params)
+                job_id, self.filename, price_per_block, qasm = self.api.create_job_api_proto(
+                    **params, debugging=debugging
+                )
                 self._timing.job_created = time.time()
                 self._reset_grpc_subscription()
                 self.current_job_id = job_id
@@ -1748,11 +1571,13 @@ class _DynexSampler:
                         self.logger.error(
                             "This indicates the backend doesn't support QASM conversion or the converter failed."
                         )
-                        raise ValueError("QASM data is None. Backend may not support QASM processing.")
+                        raise DynexJobError("QASM data is None. Backend may not support QASM processing.")
                     _data = qasm
                     if not isinstance(_data, dict) or "feed_dict" not in _data or "model" not in _data:
                         self.logger.error(f"Invalid QASM data format: {type(_data)}")
-                        raise ValueError("Invalid QASM data format. Expected dict with 'feed_dict' and 'model' keys.")
+                        raise DynexJobError(
+                            "Invalid QASM data format. Expected dict with 'feed_dict' and 'model' keys."
+                        )
                     _feed_dict = _data["feed_dict"]
                     _model = _data["model"]
                     if debugging:
@@ -1771,13 +1596,14 @@ class _DynexSampler:
                     self.clauses = _model.bqm.to_qubo()
                     self.var_mappings = _model.var_mappings
                     self.precision = _model.precision
-                    self._save_wcnf(
-                        self.clauses,
-                        self.filepath + self.filename,
-                        self.num_variables,
-                        self.num_clauses,
-                        self.var_mappings,
-                    )
+                    if self.config.debug_save_solutions:
+                        self._save_wcnf(
+                            self.clauses,
+                            self.filepath + self.filename,
+                            self.num_variables,
+                            self.num_clauses,
+                            self.var_mappings,
+                        )
                     self.model.clauses = self.clauses
                     self.model.num_variables = self.num_variables
                     self.model.num_clauses = self.num_clauses
@@ -1879,7 +1705,7 @@ class _DynexSampler:
                     # Always use v2 format (dynexcore)
                     population_size = num_reads
                     if rank > population_size:
-                        raise Exception(
+                        raise DynexValidationError(
                             f"Rank must be equal to population size! Shots:{rank} Population:{population_size}"
                         )
                     command = self.solver_path + "dynexcore"
@@ -1979,7 +1805,7 @@ class _DynexSampler:
                     error_msg = f"Job failed: {self._job_error}"
                     if self.logging:
                         self.logger.error(f"{error_msg}")
-                    raise RuntimeError(error_msg)
+                    raise DynexJobError(error_msg)
 
                 # Check timeout
                 elapsed_real_time = time.time() - t_start
@@ -1994,7 +1820,7 @@ class _DynexSampler:
                         )
                         if self.logging:
                             self.logger.error(f"{error_msg}")
-                        raise RuntimeError(error_msg)
+                        raise DynexJobError(error_msg)
                     else:
                         if self.logging:
                             self.logger.warning(
@@ -2392,8 +2218,9 @@ class _DynexSampler:
                 sample_dict = self._convert(sample)
                 sampleset_clean.append(sample_dict)
 
-            # Delete local files
-            if self.config.remove_local_solutions and not self.preserve_solutions:
+            # Delete local files: always on mainnet unless preserve_solutions=True,
+            # or on local solver when remove_local_solutions=True.
+            if (self.config.mainnet or self.config.remove_local_solutions) and not self.preserve_solutions:
                 self.delete_local_files_by_prefix(self.filepath, self.filename)
 
         except KeyboardInterrupt:

@@ -30,6 +30,8 @@ from typing import Tuple
 
 import dimod
 
+from dynex.exceptions import DynexValidationError
+
 
 def scale_bqm_to_range(
     bqm: dimod.BinaryQuadraticModel,
@@ -47,10 +49,10 @@ def scale_bqm_to_range(
         Tuple of (scaled_bqm, scaling_factor)
 
     Raises:
-        ValueError: If max_abs_coeff is not positive
+        DynexValidationError: If max_abs_coeff is not positive
     """
     if max_abs_coeff <= 0:
-        raise ValueError(f"max_abs_coeff must be positive, got {max_abs_coeff}")
+        raise DynexValidationError(f"max_abs_coeff must be positive, got {max_abs_coeff}")
 
     max_abs = 0.0
     for coeff in bqm.linear.values():

@@ -104,7 +104,7 @@ def test_grover_simple_oracle(sdk_credentials, run_integration_tests, backend):
     sampler = dynex.DynexSampler(model, config=config, description=f"Grover oracle on {backend}")
 
     # Sample
-    num_reads = 20 if backend in ["cpu", "gpu"] else 1
+    num_reads = 32 if backend in ["cpu", "gpu"] else 1
     annealing_time = 1000 if backend in ["cpu", "gpu"] else 100
     sampleset = sampler.sample(num_reads=num_reads, annealing_time=annealing_time)
 
@@ -185,8 +185,8 @@ def test_grover_oracle_qpu(sdk_credentials, run_integration_tests):
 @pytest.mark.parametrize(
     "backend,num_reads",
     [
-        ("cpu", 10),
-        ("cpu", 50),
+        ("cpu", 32),
+        ("cpu", 64),
         ("gpu", 100),
         ("qpu", 5),
     ],
@@ -281,7 +281,7 @@ def test_varying_annealing_time(sdk_credentials, run_integration_tests, backend,
     sampler = dynex.DynexSampler(model, config=config)
 
     # Sample
-    kwargs = {"num_reads": 10, "annealing_time": annealing_time}
+    kwargs = {"num_reads": 32, "annealing_time": annealing_time}
     if backend == "qpu":
         kwargs["qpu_max_coeff"] = 9.0
 

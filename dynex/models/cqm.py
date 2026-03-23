@@ -29,6 +29,7 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import dimod
 
 from dynex.config import DynexConfig
+from dynex.exceptions import DynexModelError
 
 from .base import DynexModel
 
@@ -45,7 +46,7 @@ class CQM(DynexModel):
         elif formula == 2:
             r = self._convert_bqm_to_qubo_direct(bqm, logging)
         else:
-            raise Exception(f"Unknown value of formula: {formula}. It must be in [1, 2].")
+            raise DynexModelError(f"Unknown value of formula: {formula}. It must be in [1, 2].")
         self.clauses = r.clauses
         self.num_variables = r.num_variables
         self.num_clauses = r.num_clauses
@@ -54,7 +55,7 @@ class CQM(DynexModel):
         self.bqm = r.bqm
         self.wcnf_offset = r.wcnf_offset
         if (self.num_clauses + self.num_variables) == 0:
-            raise Exception("Could not initiate model - no variables & clauses.")
+            raise DynexModelError("Could not initiate model - no variables & clauses.")
         self.type = "wcnf"
         self.logging = logging
         self.type_str = "CQM"
