@@ -7,7 +7,7 @@ import logging
 import pytest
 
 from dynex import DynexConfig
-from dynex.grpc_client import DynexGrpcClient
+from dynex.grpc_client import DynexGrpcClient, _qubo_arrays_to_wcnf_bytes
 
 
 def test_grpc_client_initialization():
@@ -92,3 +92,13 @@ def test_iter_create_job_from_data_requests_message_sequence():
     assert pytest.approx(list(jd.val), abs=1e-5) == [1.5, -2.0]
     assert pytest.approx(jd.offset, abs=1e-5) == 0.5
     assert jd.filename == "test.dnx"
+
+
+def test_qubo_arrays_to_wcnf_bytes_header_and_lines():
+    """Same wire format as QRE ReconstructWCNF (integration with legacy chunk path)."""
+    b = _qubo_arrays_to_wcnf_bytes([0, 1, 2], [0, 1, 2], [1.5, -2.0, 0.5], 0.0, 3)
+    lines = b.decode().strip().split("\n")
+    assert lines[0] == "p qubo 3 3 0"
+    assert lines[1] == "0 0 1.5"
+    assert lines[2] == "1 1 -2"
+    assert lines[3] == "2 2 0.5"

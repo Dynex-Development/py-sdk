@@ -28,10 +28,12 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
 import sys
+import tempfile
 from typing import TYPE_CHECKING, Iterable, NamedTuple, Optional, Tuple, Union
 from urllib.parse import urlparse
 
@@ -50,6 +52,22 @@ class JobCreationResult(NamedTuple):
     filename: str
     price_per_block: float
     qasm: dict | None
+
+
+def _qubo_arrays_to_wcnf_bytes(
+    rows: list,
+    cols: list,
+    vals: list,
+    offset: float,
+    num_vars: int,
+) -> bytes:
+    """Build WCNF text matching QRE ReconstructWCNF / legacy chunk pipeline."""
+    n = len(rows)
+    buf = io.StringIO()
+    buf.write(f"p qubo {int(num_vars)} {n} {float(offset):g}\n")
+    for r, c, v in zip(rows, cols, vals):
+        buf.write(f"{int(r)} {int(c)} {float(v):g}\n")
+    return buf.getvalue().encode("utf-8")
 
 
 class DynexGrpcClient:
@@ -336,6 +354,37 @@ class DynexGrpcClient:
         )
         yield sdk_pb2.CreateJobRequest(job_data=job_data_msg)
 
+    def _create_job_via_wcnf_chunks(
+        self,
+        opts: Union["JobOptions", dict],
+        rows: list,
+        cols: list,
+        vals: list,
+        offset: float,
+        num_vars: int,
+        job_filename: str,
+        retry_count: int,
+    ) -> JobCreationResult:
+        """Legacy QRE without job_data oneof: upload the same QUBO as WCNF file chunks."""
+        payload = _qubo_arrays_to_wcnf_bytes(rows, cols, vals, offset, num_vars)
+        fd, path = tempfile.mkstemp(suffix=".wcnf", prefix="dynex_job_")
+        closed = False
+        try:
+            os.write(fd, payload)
+            os.close(fd)
+            closed = True
+            return self.create_job(opts, path, job_filename, retry_count)
+        finally:
+            if not closed:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
     def create_job_from_data(
         self,
         opts: Union["JobOptions", dict],
@@ -365,6 +414,14 @@ class DynexGrpcClient:
                     qasm=qasm,
                 )
             except grpc.RpcError as e:
+                details = (e.details() or "").lower()
+                if e.code() == grpc.StatusCode.INVALID_ARGUMENT and "unsupported payload" in details:
+                    self._log_warning(
+                        "Server does not accept job_data (legacy QRE); falling back to WCNF chunk upload"
+                    )
+                    return self._create_job_via_wcnf_chunks(
+                        opts, rows, cols, vals, offset, num_vars, job_filename, retry_count
+                    )
                 last_exception = e
                 self._log_error(f"gRPC request failed: {e}")
                 if try_count > 1:
