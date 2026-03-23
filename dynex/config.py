@@ -277,13 +277,11 @@ class DynexConfig:
         raw = endpoint
         for prefix in ("https://", "http://", "grpc://"):
             if raw.startswith(prefix):
-                raw = raw[len(prefix):]
+                raw = raw[len(prefix) :]
                 break
 
         if ":" not in raw:
-            raise DynexValidationError(
-                f"grpc_endpoint must include a port (host:port), got '{endpoint}'"
-            )
+            raise DynexValidationError(f"grpc_endpoint must include a port (host:port), got '{endpoint}'")
         host, _, port = raw.rpartition(":")
         if not host:
             raise DynexValidationError(f"grpc_endpoint has empty host, got '{endpoint}'")

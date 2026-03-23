@@ -51,9 +51,7 @@ def ensure_voltage_text(line) -> str:
         try:
             data = decompress_bytes(data, "zstd")
         except ModuleNotFoundError as exc:
-            raise ModuleNotFoundError(
-                "zstandard is required to decode zstd-compressed solution results"
-            ) from exc
+            raise ModuleNotFoundError("zstandard is required to decode zstd-compressed solution results") from exc
 
     try:
         return data.decode("utf-8")
@@ -84,9 +82,7 @@ def extract_voltage_values(
         data_lines = data_lines[1:]
 
     target_line = data_lines[-1] if prefer_last else data_lines[0]
-    voltages = [
-        value.strip() for value in re.split(r",\s*", target_line) if value.strip()
-    ]
+    voltages = [value.strip() for value in re.split(r",\s*", target_line) if value.strip()]
     return voltages if voltages else ["NaN"]
 
 

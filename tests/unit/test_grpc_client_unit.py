@@ -78,9 +78,7 @@ def test_iter_create_job_from_data_requests_message_sequence():
     vals = [1.5, -2.0]
 
     messages = list(
-        client._iter_create_job_from_data_requests(
-            opts, rows, cols, vals, offset=0.5, num_vars=2, filename="test.dnx"
-        )
+        client._iter_create_job_from_data_requests(opts, rows, cols, vals, offset=0.5, num_vars=2, filename="test.dnx")
     )
 
     assert len(messages) == 2

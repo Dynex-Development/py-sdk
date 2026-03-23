@@ -209,18 +209,22 @@ def _make_solution(name, raw_bytes, kind="inline"):
     import base64
 
     encoded = base64.b64encode(raw_bytes).decode("ascii")
-    obj = type("S", (), {
-        "name": name,
-        "data": encoded,
-        "url": "",
-        "kind": kind,
-        "compression": "",
-        "valid": True,
-        "subject": "",
-        "checksum": "",
-        "size": len(raw_bytes),
-        "compressed_size": 0,
-    })()
+    obj = type(
+        "S",
+        (),
+        {
+            "name": name,
+            "data": encoded,
+            "url": "",
+            "kind": kind,
+            "compression": "",
+            "valid": True,
+            "subject": "",
+            "checksum": "",
+            "size": len(raw_bytes),
+            "compressed_size": 0,
+        },
+    )()
     obj.ListFields = lambda: []
     return obj
 

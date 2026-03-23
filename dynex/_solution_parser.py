@@ -57,6 +57,7 @@ class SolutionMetrics(NamedTuple):
 # Coercion helpers
 # ---------------------------------------------------------------------------
 
+
 def coerce_int(value) -> Optional[int]:
     if value is None or value == "":
         return None
@@ -81,6 +82,7 @@ def coerce_float(value) -> Optional[float]:
 # ---------------------------------------------------------------------------
 # Name / subject / stats parsing
 # ---------------------------------------------------------------------------
+
 
 def sanitize_solution_name(name: str) -> str:
     if not name:
@@ -136,11 +138,7 @@ def extract_solution_stats(solution, remote_name: str) -> dict:
     stats: dict[str, object] = {}
     if subject_stats:
         stats.update(subject_stats)
-        data_field = (
-            subject_stats.get("data")
-            or subject_stats.get("payload")
-            or subject_stats.get("inline_data")
-        )
+        data_field = subject_stats.get("data") or subject_stats.get("payload") or subject_stats.get("inline_data")
         if data_field:
             stats["inline_data"] = data_field
     numeric_stats = {}
@@ -195,15 +193,14 @@ def solution_metrics_from_filename(
 # Binary / protobuf helpers
 # ---------------------------------------------------------------------------
 
+
 def decompress_bytes(data: bytes, compression: Optional[str]) -> bytes:
     if not compression:
         return data
     compression = compression.lower()
     if compression == "zstd":
         if zstd is None:
-            raise ModuleNotFoundError(
-                "zstandard is required to decode zstd-compressed solutions"
-            )
+            raise ModuleNotFoundError("zstandard is required to decode zstd-compressed solutions")
         decompressor = zstd.ZstdDecompressor()
         try:
             return decompressor.decompress(data)
@@ -244,9 +241,7 @@ def skip_field(buffer: bytes, index: int, wire_type: int) -> int:
     elif wire_type == 5:
         index += 4
     else:
-        raise DynexJobError(
-            f"unknown wire type {wire_type} while decoding solution payload"
-        )
+        raise DynexJobError(f"unknown wire type {wire_type} while decoding solution payload")
     return index
 
 

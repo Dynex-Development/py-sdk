@@ -449,7 +449,11 @@ class _DynexSampler:
                 self.precision = model.precision
                 if not self.config.mainnet:
                     self._save_wcnf(
-                        self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses, self.var_mappings
+                        self.clauses,
+                        self.filepath + self.filename,
+                        self.num_variables,
+                        self.num_clauses,
+                        self.var_mappings,
                     )
 
             elif model.type == "qasm":
@@ -971,7 +975,9 @@ class _DynexSampler:
                         self.logger.warning(f"Base64 decode failed, trying raw data: {decode_exc}")
                     compressed_data = inline_data.encode("utf-8") if isinstance(inline_data, str) else inline_data
 
-                raw_data = self._decompress_bytes(compressed_data, compression_hint) if compression_hint else compressed_data
+                raw_data = (
+                    self._decompress_bytes(compressed_data, compression_hint) if compression_hint else compressed_data
+                )
                 self._log_debug(f"Inline solution decoded name={remote_name} size={len(raw_data)}")
             except Exception as exc:
                 if self.logging:
@@ -1037,9 +1043,7 @@ class _DynexSampler:
         solutions_count = len(self._downloaded_solutions)
 
         if self.logging:
-            self.logger.debug(
-                f"Solution added to downloaded_solutions: {remote_name}, total_count={solutions_count}"
-            )
+            self.logger.debug(f"Solution added to downloaded_solutions: {remote_name}, total_count={solutions_count}")
             expected = getattr(self, "expected_shots", None)
             if expected:
                 self.logger.info(f"Shot {solutions_count}/{expected} received")
@@ -1090,21 +1094,16 @@ class _DynexSampler:
         if not stats:
             stats = self._grpc_solution_stats.get(info, {})
         if not stats:
-            remote_lookup = (
-                self._grpc_solution_remote.get(filename)
-                or self._grpc_solution_remote.get(info)
-            )
+            remote_lookup = self._grpc_solution_remote.get(filename) or self._grpc_solution_remote.get(info)
             if remote_lookup:
                 stats = self._grpc_solution_stats.get(remote_lookup, {})
         return stats
 
-    def _solution_metrics_from_filename(
-        self, filename: str, fallback_info: str, stats: dict
-    ) -> SolutionMetrics:
+    def _solution_metrics_from_filename(self, filename: str, fallback_info: str, stats: dict) -> SolutionMetrics:
         return solution_metrics_from_filename(filename, fallback_info, stats)
 
     def _get_solution_metrics(self, filename: str) -> SolutionMetrics:
-        info = filename[len(self.filename) + 1:]
+        info = filename[len(self.filename) + 1 :]
         stats = {}
         if self.config.mainnet:
             stats = self._lookup_grpc_stats(filename, info)
@@ -1192,7 +1191,9 @@ class _DynexSampler:
             self.var_mappings = model.var_mappings
             self.precision = model.precision
             if not self.config.mainnet:
-                self._save_wcnf(self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses, self.var_mappings)
+                self._save_wcnf(
+                    self.clauses, self.filepath + self.filename, self.num_variables, self.num_clauses, self.var_mappings
+                )
 
         self.type = model.type
         self.assignments = {}
@@ -1574,7 +1575,9 @@ class _DynexSampler:
                     _data = qasm
                     if not isinstance(_data, dict) or "feed_dict" not in _data or "model" not in _data:
                         self.logger.error(f"Invalid QASM data format: {type(_data)}")
-                        raise DynexJobError("Invalid QASM data format. Expected dict with 'feed_dict' and 'model' keys.")
+                        raise DynexJobError(
+                            "Invalid QASM data format. Expected dict with 'feed_dict' and 'model' keys."
+                        )
                     _feed_dict = _data["feed_dict"]
                     _model = _data["model"]
                     if debugging:

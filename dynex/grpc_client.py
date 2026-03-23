@@ -353,9 +353,7 @@ class DynexGrpcClient:
             try:
                 stub = self._get_stub()
                 response = stub.CreateJob(
-                    self._iter_create_job_from_data_requests(
-                        opts, rows, cols, vals, offset, num_vars, job_filename
-                    ),
+                    self._iter_create_job_from_data_requests(opts, rows, cols, vals, offset, num_vars, job_filename),
                     metadata=self._metadata(),
                 )
                 qasm = json.loads(response.qasm_json) if response.qasm_json else None

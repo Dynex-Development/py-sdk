@@ -232,6 +232,7 @@ class DynexAPI:
 
         if debugging:
             import os
+
             os.makedirs(sampler.filepath, exist_ok=True)
             sampler._save_wcnf(
                 sampler.clauses,
