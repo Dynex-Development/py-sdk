@@ -70,7 +70,7 @@ from dynex._solution_parser import (
 from dynex._voltage import ensure_voltage_text, extract_voltage_values, process_voltage_line
 from dynex.api import DynexAPI
 from dynex.config import DynexConfig
-from dynex.exceptions import DynexJobError, DynexModelError, DynexSolverError, DynexValidationError
+from dynex.exceptions import DynexJobError, DynexModelError, DynexValidationError
 from dynex.models import BQM
 from dynex.proto import sdk_pb2
 

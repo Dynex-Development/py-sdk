@@ -3,13 +3,11 @@ Unit tests for dynex.grpc_client module
 """
 
 import logging
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 from dynex import DynexConfig
 from dynex.grpc_client import DynexGrpcClient
-from dynex.proto import sdk_pb2
 
 
 def test_grpc_client_initialization():
