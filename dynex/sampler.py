@@ -721,7 +721,7 @@ class _DynexSampler:
                 return
             except Exception as exc:  # pragma: no cover - network interaction
                 if self.logging:
-                    self.logger.error(f"Failed to subscribe to job {job_id}: {exc}")
+                    self.logger.warning("Failed to connect to server, retrying...")
                 self._log_debug(f"SubscribeJob exception job_id={job_id}: {exc}")
                 time.sleep(min(backoff, 5.0))
                 backoff = min(backoff * 2, 5.0)
@@ -808,13 +808,13 @@ class _DynexSampler:
                     self._log_debug("SubscribeJob RPC returned UNIMPLEMENTED; enabling polling fallback")
                     return
                 if self.logging and code != grpc.StatusCode.CANCELLED:
-                    self.logger.warning(f"SubscribeJob stream interrupted ({code}): {exc}")
+                    self.logger.warning("Connection to server interrupted, reconnecting...")
                 self._log_debug(f"SubscribeJob stream interrupted job_id={job_id} code={code} error={exc}")
                 time.sleep(1.0)
                 continue
             except Exception as exc:  # pragma: no cover - network interaction
                 if self.logging:
-                    self.logger.error(f"SubscribeJob stream error: {exc}")
+                    self.logger.warning("Lost connection to server, retrying...")
                 self._log_debug(f"SubscribeJob stream error job_id={job_id}: {exc}")
                 time.sleep(1.0)
                 continue
@@ -1130,7 +1130,8 @@ class _DynexSampler:
             raise
         except Exception as exc:
             if self.logging:
-                self.logger.error(f"gRPC subscription error: {exc}")
+                self.logger.error("Failed to establish server connection for solution delivery")
+            self._log_debug(f"gRPC subscription error: {exc}")
             raise
 
         drained = False
@@ -2231,9 +2232,11 @@ class _DynexSampler:
 
         except Exception as e:
             if mainnet and job_id is not None:
-                self.api.cancel_job_api(job_id)
-            self.logger.info(f"Exception encountered during exception handling: {e}")
-            raise e
+                try:
+                    self.api.cancel_job_api(job_id)
+                except Exception:
+                    pass
+            raise
         finally:
             if self.config.mainnet:
                 self._stop_grpc_subscription()
