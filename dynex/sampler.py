@@ -648,6 +648,14 @@ class _DynexSampler:
     def validate_file(self, file, debugging=False):
         return True
 
+    def _try_cancel_job(self, job_id, mainnet: bool) -> None:
+        if not mainnet or job_id is None:
+            return
+        try:
+            self.api.cancel_job_api(job_id)
+        except Exception:
+            pass
+
     def _stop_grpc_subscription(self):
         thread = self._grpc_stream_thread
         if thread is None:
@@ -2224,18 +2232,10 @@ class _DynexSampler:
             if (self.config.mainnet or self.config.remove_local_solutions) and not self.preserve_solutions:
                 self.delete_local_files_by_prefix(self.filepath, self.filename)
 
-        except KeyboardInterrupt:
-            if mainnet and job_id is not None:
-                self.api.cancel_job_api(job_id)
-            self.logger.error("Keyboard interrupt")
-            return {"error": "Keyboard interrupt"}
-
-        except Exception as e:
-            if mainnet and job_id is not None:
-                try:
-                    self.api.cancel_job_api(job_id)
-                except Exception:
-                    pass
+        except (KeyboardInterrupt, Exception) as exc:
+            self._try_cancel_job(job_id, mainnet)
+            if isinstance(exc, KeyboardInterrupt):
+                self.logger.error("Keyboard interrupt")
             raise
         finally:
             if self.config.mainnet:

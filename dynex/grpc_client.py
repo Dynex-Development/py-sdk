@@ -63,25 +63,20 @@ def _parse_grpc_error(error: grpc.RpcError) -> Exception:
     """Parse gRPC error and return appropriate Dynex exception."""
     error_message = error.details() or str(error)
     status_code = error.code()
-    
     # Authentication errors
     if status_code == grpc.StatusCode.UNAUTHENTICATED or "invalid API key" in error_message.lower():
         return DynexAuthenticationError(f"Authentication failed: {error_message}")
-    
     # Permission errors (invalid API key can also come as PERMISSION_DENIED)
     if status_code == grpc.StatusCode.PERMISSION_DENIED:
         if "invalid api key" in error_message.lower() or "unauthorized" in error_message.lower():
             return DynexAuthenticationError(f"Authentication failed: {error_message}")
         return DynexJobError(f"Permission denied: {error_message}")
-    
     # Validation errors
     if status_code == grpc.StatusCode.INVALID_ARGUMENT:
         return DynexValidationError(f"Invalid request: {error_message}")
-    
     # Connection/network errors
     if status_code in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED):
         return DynexConnectionError(f"Connection failed: {error_message}")
-    
     # Default to connection error for other gRPC issues
     return DynexConnectionError(f"gRPC error ({status_code.name}): {error_message}")
 
@@ -353,7 +348,7 @@ class DynexGrpcClient:
                     raise parsed_error from e
             except Exception as e:
                 last_exception = e
-                self._log_error(f"Unexpected error during job creation")
+                self._log_error("Unexpected error during job creation")
                 self._log_debug(f"Job creation exception: {e}")
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
@@ -461,7 +456,7 @@ class DynexGrpcClient:
                     return self._create_job_via_wcnf_chunks(
                         opts, rows, cols, vals, offset, num_vars, job_filename, retry_count
                     )
-                
+
                 parsed_error = _parse_grpc_error(e)
                 last_exception = parsed_error
                 self._log_debug(f"gRPC request failed: {e}")
