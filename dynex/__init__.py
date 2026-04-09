@@ -43,6 +43,7 @@ from .compute_backend import ComputeBackend
 from .config import DynexConfig
 from .dynex_circuit import DynexCircuit
 from .exceptions import (
+    DynexAuthenticationError,
     DynexConnectionError,
     DynexError,
     DynexJobError,

@@ -35,3 +35,7 @@ class DynexSolverError(DynexError, RuntimeError):
 
 class DynexModelError(DynexError, ValueError):
     """Problem with the submitted model (empty, invalid formula, etc.)."""
+
+
+class DynexAuthenticationError(DynexError, PermissionError):
+    """Authentication failure (invalid API key, expired token, etc.)."""

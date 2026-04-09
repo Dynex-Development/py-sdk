@@ -648,6 +648,14 @@ class _DynexSampler:
     def validate_file(self, file, debugging=False):
         return True
 
+    def _try_cancel_job(self, job_id, mainnet: bool) -> None:
+        if not mainnet or job_id is None:
+            return
+        try:
+            self.api.cancel_job_api(job_id)
+        except Exception:
+            pass
+
     def _stop_grpc_subscription(self):
         thread = self._grpc_stream_thread
         if thread is None:
@@ -721,7 +729,7 @@ class _DynexSampler:
                 return
             except Exception as exc:  # pragma: no cover - network interaction
                 if self.logging:
-                    self.logger.error(f"Failed to subscribe to job {job_id}: {exc}")
+                    self.logger.warning("Failed to connect to server, retrying...")
                 self._log_debug(f"SubscribeJob exception job_id={job_id}: {exc}")
                 time.sleep(min(backoff, 5.0))
                 backoff = min(backoff * 2, 5.0)
@@ -808,13 +816,13 @@ class _DynexSampler:
                     self._log_debug("SubscribeJob RPC returned UNIMPLEMENTED; enabling polling fallback")
                     return
                 if self.logging and code != grpc.StatusCode.CANCELLED:
-                    self.logger.warning(f"SubscribeJob stream interrupted ({code}): {exc}")
+                    self.logger.warning("Connection to server interrupted, reconnecting...")
                 self._log_debug(f"SubscribeJob stream interrupted job_id={job_id} code={code} error={exc}")
                 time.sleep(1.0)
                 continue
             except Exception as exc:  # pragma: no cover - network interaction
                 if self.logging:
-                    self.logger.error(f"SubscribeJob stream error: {exc}")
+                    self.logger.warning("Lost connection to server, retrying...")
                 self._log_debug(f"SubscribeJob stream error job_id={job_id}: {exc}")
                 time.sleep(1.0)
                 continue
@@ -1130,7 +1138,8 @@ class _DynexSampler:
             raise
         except Exception as exc:
             if self.logging:
-                self.logger.error(f"gRPC subscription error: {exc}")
+                self.logger.error("Failed to establish server connection for solution delivery")
+            self._log_debug(f"gRPC subscription error: {exc}")
             raise
 
         drained = False
@@ -2223,17 +2232,11 @@ class _DynexSampler:
             if (self.config.mainnet or self.config.remove_local_solutions) and not self.preserve_solutions:
                 self.delete_local_files_by_prefix(self.filepath, self.filename)
 
-        except KeyboardInterrupt:
-            if mainnet and job_id is not None:
-                self.api.cancel_job_api(job_id)
-            self.logger.error("Keyboard interrupt")
-            return {"error": "Keyboard interrupt"}
-
-        except Exception as e:
-            if mainnet and job_id is not None:
-                self.api.cancel_job_api(job_id)
-            self.logger.info(f"Exception encountered during exception handling: {e}")
-            raise e
+        except (KeyboardInterrupt, Exception) as exc:
+            self._try_cancel_job(job_id, mainnet)
+            if isinstance(exc, KeyboardInterrupt):
+                self.logger.error("Keyboard interrupt")
+            raise
         finally:
             if self.config.mainnet:
                 self._stop_grpc_subscription()

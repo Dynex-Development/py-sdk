@@ -39,7 +39,12 @@ from urllib.parse import urlparse
 
 import grpc
 
-from dynex.exceptions import DynexConnectionError, DynexJobError, DynexValidationError
+from dynex.exceptions import (
+    DynexAuthenticationError,
+    DynexConnectionError,
+    DynexJobError,
+    DynexValidationError,
+)
 from dynex.proto import sdk_pb2, sdk_pb2_grpc
 
 if TYPE_CHECKING:
@@ -52,6 +57,28 @@ class JobCreationResult(NamedTuple):
     filename: str
     price_per_block: float
     qasm: dict | None
+
+
+def _parse_grpc_error(error: grpc.RpcError) -> Exception:
+    """Parse gRPC error and return appropriate Dynex exception."""
+    error_message = error.details() or str(error)
+    status_code = error.code()
+    # Authentication errors
+    if status_code == grpc.StatusCode.UNAUTHENTICATED or "invalid API key" in error_message.lower():
+        return DynexAuthenticationError(f"Authentication failed: {error_message}")
+    # Permission errors (invalid API key can also come as PERMISSION_DENIED)
+    if status_code == grpc.StatusCode.PERMISSION_DENIED:
+        if "invalid api key" in error_message.lower() or "unauthorized" in error_message.lower():
+            return DynexAuthenticationError(f"Authentication failed: {error_message}")
+        return DynexJobError(f"Permission denied: {error_message}")
+    # Validation errors
+    if status_code == grpc.StatusCode.INVALID_ARGUMENT:
+        return DynexValidationError(f"Invalid request: {error_message}")
+    # Connection/network errors
+    if status_code in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED):
+        return DynexConnectionError(f"Connection failed: {error_message}")
+    # Default to connection error for other gRPC issues
+    return DynexConnectionError(f"gRPC error ({status_code.name}): {error_message}")
 
 
 def _qubo_arrays_to_wcnf_bytes(
@@ -305,19 +332,28 @@ class DynexGrpcClient:
                     qasm=qasm,
                 )
             except grpc.RpcError as e:
-                last_exception = e
-                self._log_error(f"gRPC request failed: {e}")
+                parsed_error = _parse_grpc_error(e)
+                last_exception = parsed_error
+                self._log_debug(f"gRPC request failed: {e}")
+
+                # Don't retry authentication errors
+                if isinstance(parsed_error, DynexAuthenticationError):
+                    self._log_error(str(parsed_error))
+                    raise parsed_error from e
+
+                self._log_error(str(parsed_error))
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
                 else:
-                    raise DynexConnectionError(f"gRPC job creation failed: {e}") from e
+                    raise parsed_error from e
             except Exception as e:
                 last_exception = e
-                self._log_error(f"Unexpected error: {e}")
+                self._log_error("Unexpected error during job creation")
+                self._log_debug(f"Job creation exception: {e}")
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
                 else:
-                    raise DynexJobError(f"Job creation failed: {e}") from e
+                    raise DynexJobError("Job creation failed due to an unexpected error") from e
 
         raise DynexJobError(
             f"Job creation failed after {retry_count} attempts: {str(last_exception)}"
@@ -417,22 +453,32 @@ class DynexGrpcClient:
                 details = (e.details() or "").lower()
                 if e.code() == grpc.StatusCode.INVALID_ARGUMENT and "unsupported payload" in details:
                     self._log_warning("Server does not accept job_data (legacy QRE); falling back to WCNF chunk upload")
-                    return self._creatmake_job_via_wcnf_chunks(
+                    return self._create_job_via_wcnf_chunks(
                         opts, rows, cols, vals, offset, num_vars, job_filename, retry_count
                     )
-                last_exception = e
-                self._log_error(f"gRPC request failed: {e}")
+
+                parsed_error = _parse_grpc_error(e)
+                last_exception = parsed_error
+                self._log_debug(f"gRPC request failed: {e}")
+
+                # Don't retry authentication errors
+                if isinstance(parsed_error, DynexAuthenticationError):
+                    self._log_error(str(parsed_error))
+                    raise parsed_error from e
+
+                self._log_error(str(parsed_error))
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
                 else:
-                    raise DynexConnectionError(f"gRPC job creation failed: {e}") from e
+                    raise parsed_error from e
             except Exception as e:
                 last_exception = e
-                self._log_error(f"Unexpected error: {e}")
+                self._log_error("Unexpected error during job creation")
+                self._log_debug(f"Job creation exception: {e}")
                 if try_count > 1:
                     self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
                 else:
-                    raise DynexJobError(f"Job creation failed: {e}") from e
+                    raise DynexJobError("Job creation failed due to an unexpected error") from e
 
         raise DynexJobError(
             f"Job creation failed after {retry_count} attempts: {str(last_exception)}"
@@ -440,103 +486,121 @@ class DynexGrpcClient:
 
     def update_job(self, job_id: int) -> sdk_pb2.UpdateJobReply:
         self._log_grpc_action("Updating job", f"job_id={job_id}")
-        stub = self._get_stub()
-        response = stub.UpdateJob(
-            sdk_pb2.UpdateJobRequest(job_id=job_id),
-            metadata=self._metadata(),
-        )
-        self._log_success(f"Job updated (job_id={job_id})")
-        return response
+        try:
+            stub = self._get_stub()
+            response = stub.UpdateJob(
+                sdk_pb2.UpdateJobRequest(job_id=job_id),
+                metadata=self._metadata(),
+            )
+            self._log_success(f"Job updated (job_id={job_id})")
+            return response
+        except grpc.RpcError as e:
+            raise _parse_grpc_error(e) from e
 
     def cancel_job(self, job_id: int) -> sdk_pb2.CancelJobReply:
-        stub = self._get_stub()
-        response = stub.CancelJob(
-            sdk_pb2.CancelJobRequest(job_id=job_id),
-            metadata=self._metadata(),
-        )
-        self._log_success(f"Job cancelled (job_id={response.job_id})")
-        return response
+        try:
+            stub = self._get_stub()
+            response = stub.CancelJob(
+                sdk_pb2.CancelJobRequest(job_id=job_id),
+                metadata=self._metadata(),
+            )
+            self._log_success(f"Job cancelled (job_id={response.job_id})")
+            return response
+        except grpc.RpcError as e:
+            raise _parse_grpc_error(e) from e
 
     def finish_job(self, job_id: int, min_loc: float, min_energy: float) -> sdk_pb2.FinishJobReply:
-        stub = self._get_stub()
-        # Limit min_loc to int32 range to avoid overflow
-        min_loc_int = int(min_loc) if min_loc <= 2147483647 else 2147483647
-        response = stub.FinishJob(
-            sdk_pb2.FinishJobRequest(job_id=job_id, min_loc=min_loc_int, min_energy=min_energy),
-            metadata=self._metadata(),
-        )
-        self._log_success(f"Job finished (job_id={response.job_id})")
-        return response
+        try:
+            stub = self._get_stub()
+            # Limit min_loc to int32 range to avoid overflow
+            min_loc_int = int(min_loc) if min_loc <= 2147483647 else 2147483647
+            response = stub.FinishJob(
+                sdk_pb2.FinishJobRequest(job_id=job_id, min_loc=min_loc_int, min_energy=min_energy),
+                metadata=self._metadata(),
+            )
+            self._log_success(f"Job finished (job_id={response.job_id})")
+            return response
+        except grpc.RpcError as e:
+            raise _parse_grpc_error(e) from e
 
     def download_solution(self, job_id: int, name: str, destination_path: str) -> None:
         self._log_grpc_action("Downloading solution", f"job_id={job_id}, name={name}")
-        stub = self._get_stub()
-        self._log_debug(f"gRPC DownloadSolution start job_id={job_id} name={name} destination={destination_path}")
-        download_rpc = self._resolve_rpc(
-            stub,
-            "DownloadSolution",
-            "unary_stream",
-            "/dynex.sdk.v2.SDK/DownloadSolution",
-            sdk_pb2.DownloadSolutionRequest.SerializeToString,
-            sdk_pb2.SolutionChunk.FromString,
-        )
-        stream = download_rpc(
-            sdk_pb2.DownloadSolutionRequest(job_id=job_id, name=name),
-            metadata=self._metadata(),
-        )
-        directory = os.path.dirname(destination_path)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
-        chunk_count = 0
-        total_bytes = 0
-        with open(destination_path, "wb") as fh:
-            for chunk in stream:
-                data = chunk.data
-                fh.write(data)
-                chunk_count += 1
-                total_bytes += len(data)
-        self._log_success(f"Solution downloaded (job_id={job_id}, name={name}, size={total_bytes} bytes)")
-        self._log_debug(
-            f"gRPC DownloadSolution done job_id={job_id} name={name} chunks={chunk_count} bytes={total_bytes}"
-        )
+        try:
+            stub = self._get_stub()
+            self._log_debug(f"gRPC DownloadSolution start job_id={job_id} name={name} destination={destination_path}")
+            download_rpc = self._resolve_rpc(
+                stub,
+                "DownloadSolution",
+                "unary_stream",
+                "/dynex.sdk.v2.SDK/DownloadSolution",
+                sdk_pb2.DownloadSolutionRequest.SerializeToString,
+                sdk_pb2.SolutionChunk.FromString,
+            )
+            stream = download_rpc(
+                sdk_pb2.DownloadSolutionRequest(job_id=job_id, name=name),
+                metadata=self._metadata(),
+            )
+            directory = os.path.dirname(destination_path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            chunk_count = 0
+            total_bytes = 0
+            with open(destination_path, "wb") as fh:
+                for chunk in stream:
+                    data = chunk.data
+                    fh.write(data)
+                    chunk_count += 1
+                    total_bytes += len(data)
+            self._log_success(f"Solution downloaded (job_id={job_id}, name={name}, size={total_bytes} bytes)")
+            self._log_debug(
+                f"gRPC DownloadSolution done job_id={job_id} name={name} chunks={chunk_count} bytes={total_bytes}"
+            )
+        except grpc.RpcError as e:
+            raise _parse_grpc_error(e) from e
 
     def get_solution_url(self, job_id: int, name: str) -> Tuple[str, int]:
-        stub = self._get_stub()
-        get_url_rpc = self._resolve_rpc(
-            stub,
-            "GetSolutionURL",
-            "unary_unary",
-            "/dynex.sdk.v2.SDK/GetSolutionURL",
-            sdk_pb2.GetSolutionURLRequest.SerializeToString,
-            sdk_pb2.GetSolutionURLReply.FromString,
-        )
-        reply = get_url_rpc(
-            sdk_pb2.GetSolutionURLRequest(job_id=job_id, name=name),
-            metadata=self._metadata(),
-        )
-        return reply.url, reply.ttl_seconds
+        try:
+            stub = self._get_stub()
+            get_url_rpc = self._resolve_rpc(
+                stub,
+                "GetSolutionURL",
+                "unary_unary",
+                "/dynex.sdk.v2.SDK/GetSolutionURL",
+                sdk_pb2.GetSolutionURLRequest.SerializeToString,
+                sdk_pb2.GetSolutionURLReply.FromString,
+            )
+            reply = get_url_rpc(
+                sdk_pb2.GetSolutionURLRequest(job_id=job_id, name=name),
+                metadata=self._metadata(),
+            )
+            return reply.url, reply.ttl_seconds
+        except grpc.RpcError as e:
+            raise _parse_grpc_error(e) from e
 
     def list_atomics(self, job_id: int, limit: Optional[int] = None) -> Iterable[sdk_pb2.AtomicForJob]:
         self._log_grpc_action("Listing atomics", f"job_id={job_id}, limit={limit}")
-        stub = self._get_stub()
-        request_kwargs = {"job_id": job_id}
-        if limit is not None and limit > 0:
-            request_kwargs["limit"] = int(limit)
-        list_atomics_rpc = self._resolve_rpc(
-            stub,
-            "ListAtomics",
-            "unary_unary",
-            "/dynex.sdk.v2.SDK/ListAtomics",
-            sdk_pb2.ListAtomicsRequest.SerializeToString,
-            sdk_pb2.ListAtomicsReply.FromString,
-        )
-        response = list_atomics_rpc(
-            sdk_pb2.ListAtomicsRequest(**request_kwargs),
-            metadata=self._metadata(),
-        )
-        atomics_count = len(response.items)
-        self._log_success(f"Atomics listed (job_id={job_id}, count={atomics_count})")
-        return response.items
+        try:
+            stub = self._get_stub()
+            request_kwargs = {"job_id": job_id}
+            if limit is not None and limit > 0:
+                request_kwargs["limit"] = int(limit)
+            list_atomics_rpc = self._resolve_rpc(
+                stub,
+                "ListAtomics",
+                "unary_unary",
+                "/dynex.sdk.v2.SDK/ListAtomics",
+                sdk_pb2.ListAtomicsRequest.SerializeToString,
+                sdk_pb2.ListAtomicsReply.FromString,
+            )
+            response = list_atomics_rpc(
+                sdk_pb2.ListAtomicsRequest(**request_kwargs),
+                metadata=self._metadata(),
+            )
+            atomics_count = len(response.items)
+            self._log_success(f"Atomics listed (job_id={job_id}, count={atomics_count})")
+            return response.items
+        except grpc.RpcError as e:
+            raise _parse_grpc_error(e) from e
 
     def subscribe_job(self, job_id: int, from_seq: int = 0) -> grpc.Call:
         """Start a server-streaming SubscribeJob RPC."""
