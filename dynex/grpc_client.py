@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 
 
 class JobCreationResult(NamedTuple):
-    job_id: int
+    job_id: str
     filename: str
     price_per_block: float
     qasm: dict | None
@@ -484,7 +484,7 @@ class DynexGrpcClient:
             f"Job creation failed after {retry_count} attempts: {str(last_exception)}"
         ) from last_exception
 
-    def update_job(self, job_id: int) -> sdk_pb2.UpdateJobReply:
+    def update_job(self, job_id: str) -> sdk_pb2.UpdateJobReply:
         self._log_grpc_action("Updating job", f"job_id={job_id}")
         try:
             stub = self._get_stub()
@@ -497,7 +497,7 @@ class DynexGrpcClient:
         except grpc.RpcError as e:
             raise _parse_grpc_error(e) from e
 
-    def cancel_job(self, job_id: int) -> sdk_pb2.CancelJobReply:
+    def cancel_job(self, job_id: str) -> sdk_pb2.CancelJobReply:
         try:
             stub = self._get_stub()
             response = stub.CancelJob(
@@ -509,7 +509,7 @@ class DynexGrpcClient:
         except grpc.RpcError as e:
             raise _parse_grpc_error(e) from e
 
-    def finish_job(self, job_id: int, min_loc: float, min_energy: float) -> sdk_pb2.FinishJobReply:
+    def finish_job(self, job_id: str, min_loc: float, min_energy: float) -> sdk_pb2.FinishJobReply:
         try:
             stub = self._get_stub()
             # Limit min_loc to int32 range to avoid overflow
@@ -523,7 +523,7 @@ class DynexGrpcClient:
         except grpc.RpcError as e:
             raise _parse_grpc_error(e) from e
 
-    def download_solution(self, job_id: int, name: str, destination_path: str) -> None:
+    def download_solution(self, job_id: str, name: str, destination_path: str) -> None:
         self._log_grpc_action("Downloading solution", f"job_id={job_id}, name={name}")
         try:
             stub = self._get_stub()
@@ -558,7 +558,7 @@ class DynexGrpcClient:
         except grpc.RpcError as e:
             raise _parse_grpc_error(e) from e
 
-    def get_solution_url(self, job_id: int, name: str) -> Tuple[str, int]:
+    def get_solution_url(self, job_id: str, name: str) -> Tuple[str, int]:
         try:
             stub = self._get_stub()
             get_url_rpc = self._resolve_rpc(
@@ -577,7 +577,7 @@ class DynexGrpcClient:
         except grpc.RpcError as e:
             raise _parse_grpc_error(e) from e
 
-    def list_atomics(self, job_id: int, limit: Optional[int] = None) -> Iterable[sdk_pb2.AtomicForJob]:
+    def list_atomics(self, job_id: str, limit: Optional[int] = None) -> Iterable[sdk_pb2.AtomicForJob]:
         self._log_grpc_action("Listing atomics", f"job_id={job_id}, limit={limit}")
         try:
             stub = self._get_stub()
@@ -602,7 +602,7 @@ class DynexGrpcClient:
         except grpc.RpcError as e:
             raise _parse_grpc_error(e) from e
 
-    def subscribe_job(self, job_id: int, from_seq: int = 0) -> grpc.Call:
+    def subscribe_job(self, job_id: str, from_seq: int = 0) -> grpc.Call:
         """Start a server-streaming SubscribeJob RPC."""
         stub = self._get_stub()
         self._log_debug(f"gRPC SubscribeJob start job_id={job_id} from_seq={from_seq}")

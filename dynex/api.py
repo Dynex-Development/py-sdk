@@ -65,12 +65,12 @@ class DynexAPI:
             self._grpc_client = DynexGrpcClient(self.config, self.logger)
         return self._grpc_client
 
-    def subscribe_job_events(self, job_id: int, from_seq: int = 0) -> Iterator["sdk_pb2.JobEvent"]:
+    def subscribe_job_events(self, job_id: str, from_seq: int = 0) -> Iterator["sdk_pb2.JobEvent"]:
         if not self.config.mainnet:
             raise NotImplementedError("Job subscription is only available in network mode")
         return self._get_grpc_client().subscribe_job(job_id, from_seq)
 
-    def update_job_api(self, job_id: int) -> bool:
+    def update_job_api(self, job_id: str) -> bool:
         """Update an ongoing job via gRPC."""
         if not self.config.mainnet:
             raise NotImplementedError("Job updates are only available in network mode")
@@ -83,21 +83,21 @@ class DynexAPI:
             raise NotImplementedError("Invalid solution reporting is only available in network mode")
         raise NotImplementedError("gRPC method for reporting invalid solutions not yet implemented")
 
-    def cancel_job_api(self, job_id: int) -> bool:
+    def cancel_job_api(self, job_id: str) -> bool:
         """Cancel an ongoing job."""
         if not self.config.mainnet:
             raise NotImplementedError("Job cancellation is only available in network mode")
         reply = self._get_grpc_client().cancel_job(job_id)
         return reply.job_id == job_id
 
-    def finish_job_api(self, job_id: int, min_loc: float, min_energy: float) -> bool:
+    def finish_job_api(self, job_id: str, min_loc: float, min_energy: float) -> bool:
         """Finish an ongoing job."""
         if not self.config.mainnet:
             raise NotImplementedError("Job finishing is only available in network mode")
         reply = self._get_grpc_client().finish_job(job_id, min_loc, min_energy)
         return reply.job_id == job_id
 
-    def download_solution(self, job_id: int, name: str, destination_path: str) -> None:
+    def download_solution(self, job_id: str, name: str, destination_path: str) -> None:
         """Download solution file via gRPC."""
         if not self.config.mainnet:
             raise NotImplementedError("Solution download is only available in network mode")

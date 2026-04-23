@@ -1704,7 +1704,7 @@ class _DynexSampler:
                         self.var_mappings,
                     )
 
-                job_id = -1
+                job_id = ""
 
                 # use branch-and-bound (testnet) sampler instead?:
                 bnb_binary = self.solver_path + "dynex-testnet-bnb"

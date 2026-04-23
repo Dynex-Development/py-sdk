@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n(pkg/proto/sdk/v2/solution_envelope.proto\x12\x05proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe6\x01\n\x10SolutionEnvelope\x12\x0e\n\x06job_id\x18\x01 \x01(\x03\x12\x0c\n\x04kind\x18\x02 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x03 \x01(\t\x12\x0b\n\x03url\x18\x04 \x01(\t\x12\x0c\n\x04name\x18\x05 \x01(\t\x12\x0c\n\x04size\x18\x06 \x01(\x03\x12\x17\n\x0f\x63ompressed_size\x18\x07 \x01(\x03\x12\x13\n\x0b\x63ompression\x18\x08 \x01(\t\x12\x10\n\x08\x63hecksum\x18\t \x01(\t\x12\r\n\x05valid\x18\n \x01(\x08\x12.\n\nexpires_at\x18\x0b \x01(\x0b\x32\x1a.google.protobuf.TimestampBSZQgithub.com/Dynex-Development/QuantumRouterEngine/pkg/proto/gen/dynex/sdk/v2;sdkv2b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n(pkg/proto/sdk/v2/solution_envelope.proto\x12\x05proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe6\x01\n\x10SolutionEnvelope\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x0c\n\x04kind\x18\x02 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x03 \x01(\t\x12\x0b\n\x03url\x18\x04 \x01(\t\x12\x0c\n\x04name\x18\x05 \x01(\t\x12\x0c\n\x04size\x18\x06 \x01(\x03\x12\x17\n\x0f\x63ompressed_size\x18\x07 \x01(\x03\x12\x13\n\x0b\x63ompression\x18\x08 \x01(\t\x12\x10\n\x08\x63hecksum\x18\t \x01(\t\x12\r\n\x05valid\x18\n \x01(\x08\x12.\n\nexpires_at\x18\x0b \x01(\x0b\x32\x1a.google.protobuf.TimestampBSZQgithub.com/Dynex-Development/QuantumRouterEngine/pkg/proto/gen/dynex/sdk/v2;sdkv2b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
