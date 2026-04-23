@@ -32,14 +32,14 @@ from pydantic import BaseModel
 
 
 class Job(BaseModel):
-    job_id: int
+    job_id: str
     min_energy: float
     min_loc: float
     workers: int | None = None
 
 
 class JobOpts(BaseModel):
-    job_id: int
+    job_id: str
     link: str
     price_per_block: int
     qasm: Union[dict, None] = None
