@@ -26,6 +26,8 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+from typing import Optional
+
 import dimod
 
 from dynex.config import DynexConfig
@@ -37,7 +39,7 @@ from .base import DynexModel
 class CQM(DynexModel):
     """Constrained Quadratic Model for Dynex neuromorphic computing."""
 
-    def __init__(self, cqm, relabel=True, logging=False, formula=2, config: DynexConfig = None):
+    def __init__(self, cqm, relabel=True, logging=False, formula=2, config: Optional[DynexConfig] = None):
         super().__init__(config=config, logging=logging)
 
         bqm, self.invert = dimod.cqm_to_bqm(cqm)
