@@ -224,9 +224,7 @@ class SolutionStreamingMixin:
                                 solution_payload, "checksum", ""
                             )
                             kind = getattr(solution_payload, "kind", "")
-                            has_data = hasattr(solution_payload, "data") and bool(
-                                getattr(solution_payload, "data", "")
-                            )
+                            has_data = hasattr(solution_payload, "data") and bool(getattr(solution_payload, "data", ""))
                             has_url = bool(getattr(solution_payload, "url", ""))
                             data_len = len(getattr(solution_payload, "data", "")) if has_data else 0
                             self._log_debug(
@@ -327,9 +325,7 @@ class SolutionStreamingMixin:
         meta_stats = self._extract_solution_stats(solution, remote_name)
         stats_copy = dict(meta_stats) if meta_stats else {}
         compression_hint = (
-            getattr(solution, "compression", None)
-            or stats_copy.get("compression")
-            or stats_copy.get("Compression")
+            getattr(solution, "compression", None) or stats_copy.get("compression") or stats_copy.get("Compression")
         )
         if compression_hint and "compression" not in stats_copy:
             stats_copy["compression"] = compression_hint
@@ -407,8 +403,7 @@ class SolutionStreamingMixin:
         if inline_data and kind == "inline":
             try:
                 self._log_debug(
-                    f"Processing inline solution data name={remote_name} kind={kind} "
-                    f"data_len={len(inline_data)}"
+                    f"Processing inline solution data name={remote_name} kind={kind} " f"data_len={len(inline_data)}"
                 )
                 try:
                     compressed_data = base64.b64decode(inline_data)
@@ -418,9 +413,7 @@ class SolutionStreamingMixin:
                     compressed_data = inline_data.encode("utf-8") if isinstance(inline_data, str) else inline_data
 
                 raw_data = (
-                    self._decompress_bytes(compressed_data, compression_hint)
-                    if compression_hint
-                    else compressed_data
+                    self._decompress_bytes(compressed_data, compression_hint) if compression_hint else compressed_data
                 )
                 self._log_debug(f"Inline solution decoded name={remote_name} size={len(raw_data)}")
             except Exception as exc:

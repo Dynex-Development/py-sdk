@@ -35,7 +35,6 @@ import ast
 import json
 import logging
 import math
-import multiprocessing
 import os
 import queue
 import secrets
@@ -398,10 +397,7 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
         return sample
 
     def __repr__(self) -> str:
-        return (
-            f"<_DynexSampler job={self.current_job_id!r} "
-            f"type={self.type!r} vars={self.num_variables}>"
-        )
+        return f"<_DynexSampler job={self.current_job_id!r} " f"type={self.type!r} vars={self.num_variables}>"
 
     # ------------------------------------------------------------------ #
     # Public sampling entry point                                          #
@@ -429,9 +425,8 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
         """Main sampling entry point - delegates to _sample."""
         retval = {}
 
-        # In a malleable environment, it is rarely possible that a worker is submitting an inconsistent solution file. If the job
-        # is small, we need to re-sample again. This routine samples up to NUM_RETRIES (10) times. If an error occurs, or
-        # a keyboard interrupt was triggered, the return value is a dict containing key 'error'
+        # In a malleable environment, a worker may occasionally submit an inconsistent solution file.
+        # This routine samples up to NUM_RETRIES (10) times before giving up.
 
         self.expected_shots = shots
 
@@ -591,14 +586,28 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
                     self.logger.info(f"Finished read after {elapsed_time} seconds")
                 table = [
                     [
-                        "DYNEXJOB", "QUBITS", "GATES", "NUM_READS", "SHOTS",
-                        "ANN.TIME", "ELAPSED", "WORKERS", "GROUND STATE",
+                        "DYNEXJOB",
+                        "QUBITS",
+                        "GATES",
+                        "NUM_READS",
+                        "SHOTS",
+                        "ANN.TIME",
+                        "ELAPSED",
+                        "WORKERS",
+                        "GROUND STATE",
                     ]
                 ]
                 table.append(
                     [
-                        "-1", self.num_variables, self.num_clauses, num_reads, 1,
-                        annealing_time, f"{elapsed_time:.2f}s", "PREPROCESSED", sampleset.first.energy,
+                        "-1",
+                        self.num_variables,
+                        self.num_clauses,
+                        num_reads,
+                        1,
+                        annealing_time,
+                        f"{elapsed_time:.2f}s",
+                        "PREPROCESSED",
+                        sampleset.first.energy,
                     ]
                 )
                 ta = tabulate(table, headers="firstrow", tablefmt="rounded_grid", floatfmt=".2f")
@@ -705,9 +714,7 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
                                 f"num_reads={num_reads} is very high, consider reducing for faster testing"
                             )
                         if shots > 20:
-                            self.logger.warning(
-                                f"shots={shots} is very high, consider reducing for faster testing"
-                            )
+                            self.logger.warning(f"shots={shots} is very high, consider reducing for faster testing")
                     self.logger.info("Starting job...")
             else:
                 if self.type == "qasm":
@@ -826,14 +833,28 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
                 clear_output(wait=True)
                 table = [
                     [
-                        "DYNEXJOB", "QUBITS", "GATES", "NUM_READS", "SHOTS",
-                        "ANN.TIME", "ELAPSED", "WORKERS", "GROUND STATE",
+                        "DYNEXJOB",
+                        "QUBITS",
+                        "GATES",
+                        "NUM_READS",
+                        "SHOTS",
+                        "ANN.TIME",
+                        "ELAPSED",
+                        "WORKERS",
+                        "GROUND STATE",
                     ]
                 ]
                 table.append(
                     [
-                        "", self.num_variables, self.num_clauses, num_reads, shots,
-                        annealing_time, "", "*** WAITING ***", "",
+                        "",
+                        self.num_variables,
+                        self.num_clauses,
+                        num_reads,
+                        shots,
+                        annealing_time,
+                        "",
+                        "*** WAITING ***",
+                        "",
                     ]
                 )
                 ta = tabulate(table, headers="firstrow", tablefmt="rounded_grid", floatfmt=".2f")
@@ -866,7 +887,8 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
                     else:
                         if self.logging:
                             self.logger.warning(
-                                f"Timeout after {max_wait_time:.0f}s, but received {solutions_count} solution(s). Continuing..."
+                                f"Timeout after {max_wait_time:.0f}s, but received "
+                                f"{solutions_count} solution(s). Continuing..."
                             )
                     finished = True
                     break
@@ -979,23 +1001,43 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
                     details = "*** WAITING FOR WORKERS ***"
                     table = [
                         [
-                            "DYNEXJOB", "QUBITS", "GATES", "NUM_READS", "SHOTS",
-                            "ANN.TIME", "ELAPSED", "WORKERS", "GROUND STATE",
+                            "DYNEXJOB",
+                            "QUBITS",
+                            "GATES",
+                            "NUM_READS",
+                            "SHOTS",
+                            "ANN.TIME",
+                            "ELAPSED",
+                            "WORKERS",
+                            "GROUND STATE",
                         ]
                     ]
                     if cnt_workers < 1:
                         table.append(
                             [
-                                job_id, self.num_variables, self.num_clauses, num_reads, shots,
-                                annealing_time, f"{elapsed_real_time:.0f}s", "*** WAITING ***", 0,
+                                job_id,
+                                self.num_variables,
+                                self.num_clauses,
+                                num_reads,
+                                shots,
+                                annealing_time,
+                                f"{elapsed_real_time:.0f}s",
+                                "*** WAITING ***",
+                                0,
                             ]
                         )
                     else:
                         elapsed_time = time.process_time() - t
                         table.append(
                             [
-                                job_id, self.num_variables, self.num_clauses, num_reads, shots,
-                                annealing_time, f"{elapsed_time:.2f}s", cnt_workers,
+                                job_id,
+                                self.num_variables,
+                                self.num_clauses,
+                                num_reads,
+                                shots,
+                                annealing_time,
+                                f"{elapsed_time:.2f}s",
+                                cnt_workers,
                                 (display_energy + self.model.wcnf_offset) * self.model.precision,
                             ]
                         )
@@ -1047,14 +1089,27 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
                 if mainnet:
                     table = [
                         [
-                            "DYNEXJOB", "QUBITS", "GATES", "NUM_READS", "SHOTS",
-                            "ANN.TIME", "ELAPSED", "WORKERS", "GROUND STATE",
+                            "DYNEXJOB",
+                            "QUBITS",
+                            "GATES",
+                            "NUM_READS",
+                            "SHOTS",
+                            "ANN.TIME",
+                            "ELAPSED",
+                            "WORKERS",
+                            "GROUND STATE",
                         ]
                     ]
                     table.append(
                         [
-                            job_id, self.num_variables, self.num_clauses, num_reads, shots,
-                            annealing_time, f"{elapsed_time:.2f}s", cnt_workers,
+                            job_id,
+                            self.num_variables,
+                            self.num_clauses,
+                            num_reads,
+                            shots,
+                            annealing_time,
+                            f"{elapsed_time:.2f}s",
+                            cnt_workers,
                             (display_energy + self.model.wcnf_offset) * self.model.precision,
                         ]
                     )
@@ -1125,7 +1180,8 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
                     usable_len = min(len(voltages), self.num_variables)
                     if usable_len < self.num_variables:
                         self._log_debug(
-                            f"Voltage result shorter than expected solver=2 got={len(voltages)} expected={self.num_variables}"
+                            f"Voltage result shorter than expected solver=2 "
+                            f"got={len(voltages)} expected={self.num_variables}"
                         )
                     dimodsample = {}
                     for var, value in enumerate(voltages[:usable_len]):
@@ -1143,8 +1199,16 @@ class _DynexSampler(SolutionStreamingMixin, LocalSolverMixin):
             if self.type in ["wcnf", "qasm"]:
                 sampleset.append(
                     [
-                        "sample", lowest_set, "chips", total_chips, "steps", total_steps,
-                        "falsified softs", lowest_loc, "energy", lowest_energy,
+                        "sample",
+                        lowest_set,
+                        "chips",
+                        total_chips,
+                        "steps",
+                        total_steps,
+                        "falsified softs",
+                        lowest_loc,
+                        "energy",
+                        lowest_energy,
                     ]
                 )
 
