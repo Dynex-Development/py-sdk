@@ -28,6 +28,7 @@ THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from abc import ABC
 from dataclasses import dataclass
+from typing import Optional
 
 import dimod
 import numpy as np
@@ -53,7 +54,7 @@ class DynexModel(ABC):
     Includes config and logger initialization, and conversion utilities.
     """
 
-    def __init__(self, config: DynexConfig = None, logging: bool = False):
+    def __init__(self, config: Optional[DynexConfig] = None, logging: bool = False):
         self.config = config if config is not None else DynexConfig()
         self.logger = getattr(self.config, "logger", None)
         self.logging = logging
@@ -92,11 +93,7 @@ class DynexModel(ABC):
         if logging and self.logger:
             self.logger.info("Model converted to QUBO")
 
-        newQ = []
-        for i in range(0, len(Q_list)):
-            touple = Q_list[i]
-            w = Q[0][touple]
-            newQ.append(w)
+        newQ = [Q[0][pair] for pair in Q_list]
         max_abs_coeff = np.max(np.abs(newQ))
         if max_abs_coeff == 0:
             if self.logger:
@@ -114,11 +111,10 @@ class DynexModel(ABC):
         if logging and self.logger:
             self.logger.info(f"QUBO: Constant offset of the binary quadratic model: {W_add}")
 
-        for i in range(0, len(Q_list)):
-            touple = Q_list[i]
-            i_val = int(touple[0]) + 1
-            j_val = int(touple[1]) + 1
-            w = Q[0][touple]
+        for pair in Q_list:
+            i_val = int(pair[0]) + 1
+            j_val = int(pair[1]) + 1
+            w = Q[0][pair]
             w_int = int(np.round(w / precision))
 
             if i_val == j_val:
@@ -184,12 +180,18 @@ class DynexModel(ABC):
                         wcnf_offset -= v
         wcnf_offset = wcnf_offset + bqm.offset / precision
         bqm.variables._relabel(mappings)
+
+        # Append 8 sentinel variables with a very high penalty weight so the solver
+        # can detect valid solutions: a solution is considered correct if and only if
+        # these variables satisfy the expected alternating pattern [1,0,1,0,1,0,1,0].
+        # The weight (999999) is intentionally much larger than any real coefficient so
+        # violating a sentinel clause always dominates the objective.
         validation_vars = [1, 0, 1, 0, 1, 0, 1, 0]
         validation_weight = 999999
-        for v in range(0, len(validation_vars)):
-            direction = 1 if validation_vars[v] == 1 else -1
-            i = num_variables + 1 + v
-            clauses.append([validation_weight, direction * i])
+        for idx, expected in enumerate(validation_vars):
+            direction = 1 if expected == 1 else -1
+            var_idx = num_variables + 1 + idx
+            clauses.append([validation_weight, direction * var_idx])
         num_variables += len(validation_vars)
         num_clauses = len(clauses)
         return ConversionResult(

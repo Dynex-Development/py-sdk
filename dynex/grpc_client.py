@@ -32,19 +32,13 @@ import io
 import json
 import logging
 import os
-import sys
 import tempfile
-from typing import TYPE_CHECKING, Iterable, NamedTuple, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Iterable, NamedTuple, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import grpc
 
-from dynex.exceptions import (
-    DynexAuthenticationError,
-    DynexConnectionError,
-    DynexJobError,
-    DynexValidationError,
-)
+from dynex.exceptions import DynexAuthenticationError, DynexConnectionError, DynexJobError, DynexValidationError
 from dynex.proto import sdk_pb2, sdk_pb2_grpc
 
 if TYPE_CHECKING:
@@ -129,44 +123,23 @@ class DynexGrpcClient:
             self.logger.debug(message)
 
     def _log_success(self, message: str) -> None:
-        """Log success message with green color"""
         if self.logger:
-            if sys.stdout.isatty():
-                colored_message = f"\033[92mSUCCESS: {message}\033[0m"
-            else:
-                colored_message = f"SUCCESS: {message}"
-            self.logger.info(colored_message)
+            self.logger.info(f"SUCCESS: {message}")
 
     def _log_warning(self, message: str) -> None:
-        """Log warning message with yellow color"""
         if self.logger:
-            if sys.stdout.isatty():
-                colored_message = f"\033[93m{message}\033[0m"
-            else:
-                colored_message = message
-            self.logger.warning(colored_message)
+            self.logger.warning(message)
 
     def _log_progress(self, message: str) -> None:
-        """Log progress message with blue color"""
         if self.logger:
-            if sys.stdout.isatty():
-                colored_message = f"\033[94mPROGRESS: {message}\033[0m"
-            else:
-                colored_message = f"PROGRESS: {message}"
-            self.logger.info(colored_message)
+            self.logger.info(f"PROGRESS: {message}")
 
     def _log_grpc_action(self, action: str, details: str = "") -> None:
-        """Log gRPC action with consistent formatting"""
         if self.logger:
-            if sys.stdout.isatty():
-                formatted_message = f"\033[96mgRPC: {action}\033[0m"
-                if details:
-                    formatted_message += f" \033[90m{details}\033[0m"
-            else:
-                formatted_message = f"gRPC: {action}"
-                if details:
-                    formatted_message += f" {details}"
-            self.logger.info(formatted_message)
+            msg = f"gRPC: {action}"
+            if details:
+                msg += f" {details}"
+            self.logger.info(msg)
 
     def _metadata(self) -> Tuple[Tuple[str, str], ...]:
         return (("authorization", f"Bearer {self.config.sdk_key}"),)
@@ -175,36 +148,27 @@ class DynexGrpcClient:
         if self._stub is not None:
             return self._stub
 
-        # Use dedicated GRPC_ENDPOINT if provided
         grpc_endpoint = self.config.grpc_endpoint
-        if grpc_endpoint:
-            # GRPC_ENDPOINT is typically just "host:port" without protocol
-            if "://" in grpc_endpoint:
-                parsed = urlparse(grpc_endpoint)
-                host = parsed.hostname or parsed.path
-                port = parsed.port or 3000
-                use_tls = parsed.scheme == "https"
-            else:
-                # Format is "host:port"
-                if ":" in grpc_endpoint:
-                    host, port_str = grpc_endpoint.rsplit(":", 1)
-                    port = int(port_str)
-                else:
-                    host = grpc_endpoint
-                    port = 3000
-                # Determine TLS based on host (localhost = no TLS, otherwise TLS)
-                use_tls = host not in ("localhost", "127.0.0.1")
-        else:
-            # Fallback: derive from gRPC endpoint
-            endpoint = self.config.grpc_endpoint
-            if not endpoint:
-                raise DynexValidationError("GRPC_ENDPOINT is not configured")
-            if "://" not in endpoint:
-                endpoint = f"https://{endpoint}"
-            parsed = urlparse(endpoint)
+        if not grpc_endpoint:
+            raise DynexValidationError("GRPC_ENDPOINT is not configured")
+
+        if "://" in grpc_endpoint:
+            parsed = urlparse(grpc_endpoint)
             host = parsed.hostname or parsed.path
-            port = parsed.port or (443 if parsed.scheme == "https" else 80)
-            use_tls = parsed.scheme == "https"
+            port = parsed.port or 3000
+            tls_from_scheme = parsed.scheme == "https"
+        else:
+            if ":" in grpc_endpoint:
+                host, port_str = grpc_endpoint.rsplit(":", 1)
+                port = int(port_str)
+            else:
+                host = grpc_endpoint
+                port = 3000
+            tls_from_scheme = host not in ("localhost", "127.0.0.1")
+
+        # Explicit grpc_use_tls config takes precedence over scheme/hostname heuristic.
+        explicit_tls = getattr(self.config, "grpc_use_tls", None)
+        use_tls = explicit_tls if explicit_tls is not None else tls_from_scheme
 
         target = f"{host}:{port}"
 
@@ -311,18 +275,29 @@ class DynexGrpcClient:
                     break
                 yield sdk_pb2.CreateJobRequest(chunk=sdk_pb2.JobChunk(data=chunk))
 
-    def create_job(
-        self, opts: Union["JobOptions", dict], file_zip: str, job_filename: str, retry_count: int
-    ) -> JobCreationResult:
+    def _execute_with_retry(
+        self,
+        request_iter_factory: Callable[[], Iterable],
+        job_filename: str,
+        retry_count: int,
+        grpc_error_hook: Optional[Callable[[grpc.RpcError], Optional["JobCreationResult"]]] = None,
+    ) -> "JobCreationResult":
+        """Run a CreateJob streaming RPC with retry and unified error handling.
+
+        Args:
+            request_iter_factory: Zero-arg callable that returns a fresh request iterator.
+            job_filename: Filename stored in the result.
+            retry_count: Maximum number of attempts.
+            grpc_error_hook: Optional callable invoked on each gRPC error before the
+                standard retry logic. Return a JobCreationResult to short-circuit (e.g.
+                fallback path), or None to continue with normal retry handling.
+        """
         last_exception: Optional[Exception] = None
 
         for try_count in range(retry_count, 0, -1):
             try:
                 stub = self._get_stub()
-                response = stub.CreateJob(
-                    self._iter_create_job_requests(opts, file_zip),
-                    metadata=self._metadata(),
-                )
+                response = stub.CreateJob(request_iter_factory(), metadata=self._metadata())
                 qasm = json.loads(response.qasm_json) if response.qasm_json else None
                 self._log_success(f"Job created successfully (job_id={response.job_id})")
                 return JobCreationResult(
@@ -332,11 +307,15 @@ class DynexGrpcClient:
                     qasm=qasm,
                 )
             except grpc.RpcError as e:
+                if grpc_error_hook is not None:
+                    fallback = grpc_error_hook(e)
+                    if fallback is not None:
+                        return fallback
+
                 parsed_error = _parse_grpc_error(e)
                 last_exception = parsed_error
                 self._log_debug(f"gRPC request failed: {e}")
 
-                # Don't retry authentication errors
                 if isinstance(parsed_error, DynexAuthenticationError):
                     self._log_error(str(parsed_error))
                     raise parsed_error from e
@@ -358,6 +337,15 @@ class DynexGrpcClient:
         raise DynexJobError(
             f"Job creation failed after {retry_count} attempts: {str(last_exception)}"
         ) from last_exception
+
+    def create_job(
+        self, opts: Union["JobOptions", dict], file_zip: str, job_filename: str, retry_count: int
+    ) -> JobCreationResult:
+        return self._execute_with_retry(
+            request_iter_factory=lambda: self._iter_create_job_requests(opts, file_zip),
+            job_filename=job_filename,
+            retry_count=retry_count,
+        )
 
     def _iter_create_job_from_data_requests(
         self,
@@ -432,57 +420,23 @@ class DynexGrpcClient:
         job_filename: str,
         retry_count: int,
     ) -> JobCreationResult:
-        last_exception: Optional[Exception] = None
-
-        for try_count in range(retry_count, 0, -1):
-            try:
-                stub = self._get_stub()
-                response = stub.CreateJob(
-                    self._iter_create_job_from_data_requests(opts, rows, cols, vals, offset, num_vars, job_filename),
-                    metadata=self._metadata(),
+        def _unsupported_payload_hook(e: grpc.RpcError) -> Optional[JobCreationResult]:
+            details = (e.details() or "").lower()
+            if e.code() == grpc.StatusCode.INVALID_ARGUMENT and "unsupported payload" in details:
+                self._log_warning("Server does not accept job_data (legacy QRE); falling back to WCNF chunk upload")
+                return self._create_job_via_wcnf_chunks(
+                    opts, rows, cols, vals, offset, num_vars, job_filename, retry_count
                 )
-                qasm = json.loads(response.qasm_json) if response.qasm_json else None
-                self._log_success(f"Job created successfully (job_id={response.job_id})")
-                return JobCreationResult(
-                    job_id=response.job_id,
-                    filename=job_filename,
-                    price_per_block=response.real_price_per_block,
-                    qasm=qasm,
-                )
-            except grpc.RpcError as e:
-                details = (e.details() or "").lower()
-                if e.code() == grpc.StatusCode.INVALID_ARGUMENT and "unsupported payload" in details:
-                    self._log_warning("Server does not accept job_data (legacy QRE); falling back to WCNF chunk upload")
-                    return self._create_job_via_wcnf_chunks(
-                        opts, rows, cols, vals, offset, num_vars, job_filename, retry_count
-                    )
+            return None
 
-                parsed_error = _parse_grpc_error(e)
-                last_exception = parsed_error
-                self._log_debug(f"gRPC request failed: {e}")
-
-                # Don't retry authentication errors
-                if isinstance(parsed_error, DynexAuthenticationError):
-                    self._log_error(str(parsed_error))
-                    raise parsed_error from e
-
-                self._log_error(str(parsed_error))
-                if try_count > 1:
-                    self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
-                else:
-                    raise parsed_error from e
-            except Exception as e:
-                last_exception = e
-                self._log_error("Unexpected error during job creation")
-                self._log_debug(f"Job creation exception: {e}")
-                if try_count > 1:
-                    self._log_warning(f"Retrying... ({try_count - 1} attempts left)")
-                else:
-                    raise DynexJobError("Job creation failed due to an unexpected error") from e
-
-        raise DynexJobError(
-            f"Job creation failed after {retry_count} attempts: {str(last_exception)}"
-        ) from last_exception
+        return self._execute_with_retry(
+            request_iter_factory=lambda: self._iter_create_job_from_data_requests(
+                opts, rows, cols, vals, offset, num_vars, job_filename
+            ),
+            job_filename=job_filename,
+            retry_count=retry_count,
+            grpc_error_hook=_unsupported_payload_hook,
+        )
 
     def update_job(self, job_id: str) -> sdk_pb2.UpdateJobReply:
         self._log_grpc_action("Updating job", f"job_id={job_id}")

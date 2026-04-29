@@ -26,6 +26,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+import os
 import zipfile
 from typing import TYPE_CHECKING, Iterator, List, Optional, Union
 
@@ -52,7 +53,7 @@ class DynexAPI:
     Dynex API client for gRPC communication only.
     """
 
-    def __init__(self, config: DynexConfig = None, logging: bool = True):
+    def __init__(self, config: Optional[DynexConfig] = None, logging: bool = True):
         self.config = config if config is not None else DynexConfig()
         self.logger = getattr(self.config, "logger", None)
         self.logging = logging
@@ -194,7 +195,7 @@ class DynexAPI:
             raise NotImplementedError("Job creation is only available in network mode")
 
         # Cluster and QASM paths still use file-based transport
-        if sampler.type == "qasm" or isinstance(sampler.clauses, list):
+        if sampler.type == "qasm" or sampler.is_cluster_mode:
             return self.create_job_api(
                 sampler=sampler,
                 annealing_time=annealing_time,
@@ -231,8 +232,6 @@ class DynexAPI:
             vals.append(float(v))
 
         if debugging:
-            import os
-
             os.makedirs(sampler.filepath, exist_ok=True)
             sampler._save_wcnf(
                 sampler.clauses,
@@ -326,12 +325,3 @@ class JobOptions(BaseModel):
                 raise DynexValidationError(f"compute_backend must be one of {valid_values}, got '{v}'")
             return v_lower
         return "unspecified"
-
-    def to_dict(self) -> dict:
-        """Convert to dictionary for backward compatibility."""
-        return self.model_dump()
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "JobOptions":
-        """Create from dictionary."""
-        return cls(**data)

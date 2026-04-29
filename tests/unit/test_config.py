@@ -135,3 +135,49 @@ def test_config_as_dict_includes_new_params():
     assert "preserve_solutions" in config_dict
     assert config_dict["use_notebook_output"] is False
     assert config_dict["default_timeout"] == 600.0
+
+
+def test_sdk_key_masked_in_as_dict():
+    """as_dict() must not expose the raw sdk_key."""
+    key = "ABCDEF1234567890XYZ"
+    config = DynexConfig(sdk_key=key, compute_backend="cpu")
+    config_dict = config.as_dict()
+    assert config_dict["sdk_key"] != key
+    assert "..." in config_dict["sdk_key"]
+    assert key[:6] in config_dict["sdk_key"]
+    assert key[-4:] in config_dict["sdk_key"]
+
+
+def test_sdk_key_short_masked():
+    """Short sdk_key is fully masked."""
+    config = DynexConfig(sdk_key="short", compute_backend="cpu")
+    config_dict = config.as_dict()
+    assert config_dict["sdk_key"] == "***"
+
+
+def test_tmp_dir_default(tmp_path):
+    """Without tmp_dir param, config.tmp_dir is None (./tmp used at runtime)."""
+    config = DynexConfig(sdk_key="key", compute_backend="cpu")
+    assert config.tmp_dir is None
+
+
+def test_tmp_dir_custom(tmp_path):
+    """Custom tmp_dir is stored and the directory is created."""
+    custom = str(tmp_path / "custom_tmp")
+    config = DynexConfig(sdk_key="key", compute_backend="cpu", tmp_dir=custom)
+    assert config.tmp_dir == custom
+    import os
+
+    assert os.path.isdir(custom)
+
+
+def test_grpc_use_tls_stored():
+    """grpc_use_tls is stored on the config object."""
+    config = DynexConfig(sdk_key="key", compute_backend="cpu", grpc_use_tls=False)
+    assert config.grpc_use_tls is False
+
+    config2 = DynexConfig(sdk_key="key", compute_backend="cpu", grpc_use_tls=True)
+    assert config2.grpc_use_tls is True
+
+    config3 = DynexConfig(sdk_key="key", compute_backend="cpu")
+    assert config3.grpc_use_tls is None

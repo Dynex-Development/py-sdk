@@ -34,6 +34,7 @@ import warnings
 import zlib
 from collections import Counter
 from dataclasses import dataclass
+from typing import Optional
 
 import pennylane as qml
 from pennylane import numpy as np
@@ -77,7 +78,7 @@ class CircuitModel:
 class DynexCircuit:
     description: str = "Dynex SDK Job"
 
-    def __init__(self, config: DynexConfig = None):
+    def __init__(self, config: Optional[DynexConfig] = None):
         self.config = config if config is not None else DynexConfig()
         self.logger = self.config.logger
 

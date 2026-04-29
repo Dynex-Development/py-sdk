@@ -421,3 +421,68 @@ def test_lookup_grpc_stats_missing(mock_model):
         stats = sampler._lookup_grpc_stats("nonexistent.txt", "info")
 
         assert stats == {}
+
+
+def test_is_cluster_mode_single_model(mock_model):
+    """is_cluster_mode is False for a single QUBO problem."""
+    config = DynexConfig(compute_backend="cpu")
+
+    with patch("dynex.grpc_client.DynexGrpcClient"):
+        sampler = _DynexSampler(mock_model, logging=False, config=config)
+
+    # Single model: clauses is a tuple, not a list
+    assert sampler.is_cluster_mode is False
+
+
+def test_save_wcnf_correctness(mock_model, tmp_path):
+    """_save_wcnf must apply var_mappings and produce a valid QUBO file."""
+    config = DynexConfig(compute_backend="cpu")
+
+    with patch("dynex.grpc_client.DynexGrpcClient"):
+        sampler = _DynexSampler(mock_model, logging=False, config=config)
+
+    # var_mappings: new_int -> original_int
+    # clauses[0]: dict keyed by original_int -> must be remapped back to new_int
+    var_mappings = {0: 10, 1: 11, 2: 12}
+    qubo = {(10, 10): 1.5, (11, 12): -0.5}
+    clauses = (qubo, 0.25)
+    filename = str(tmp_path / "test.wcnf")
+    sampler._save_wcnf(clauses, filename, 3, 2, var_mappings)
+
+    content = (tmp_path / "test.wcnf").read_text()
+    assert "p qubo 3 2" in content
+    data_lines = [ln for ln in content.splitlines() if not ln.startswith("p")]
+    assert len(data_lines) == 2
+    # Keys 10->0 and 11->1, 12->2 per the inverse mapping
+    tokens = [ln.split() for ln in data_lines]
+    written_pairs = {(int(t[0]), int(t[1])) for t in tokens}
+    assert (0, 0) in written_pairs
+    assert (1, 2) in written_pairs
+
+
+def test_save_wcnf_large_var_mappings(mock_model, tmp_path):
+    """_save_wcnf must not degrade with large var_mappings (O(1) per entry)."""
+    import time as _time
+
+    config = DynexConfig(compute_backend="cpu")
+
+    with patch("dynex.grpc_client.DynexGrpcClient"):
+        sampler = _DynexSampler(mock_model, logging=False, config=config)
+
+    n = 1000
+    # var_mappings: int -> int (new_int -> original)
+    var_mappings = {i: i + 1000 for i in range(n)}
+    qubo = {(i + 1000, i + 1000): float(i) for i in range(n)}
+    clauses = (qubo, 0.0)
+    filename = str(tmp_path / "large.wcnf")
+
+    t0 = _time.monotonic()
+    sampler._save_wcnf(clauses, filename, n, n, var_mappings)
+    elapsed = _time.monotonic() - t0
+
+    content = (tmp_path / "large.wcnf").read_text()
+    lines = content.splitlines()
+    assert lines[0].startswith("p qubo")
+    assert len(lines) == n + 1
+    # Should be fast — well under 1s for 1000 entries
+    assert elapsed < 1.0

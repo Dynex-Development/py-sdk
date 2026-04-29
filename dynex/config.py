@@ -89,6 +89,8 @@ class DynexConfig:
         default_description: str = "Dynex SDK Job",
         preserve_solutions: bool = False,
         debug_save_solutions: bool = False,
+        tmp_dir: Optional[str] = None,
+        grpc_use_tls: Optional[bool] = None,
     ) -> None:
         self.logger = self._init_logger()
         self.retry_count = retry_count
@@ -98,6 +100,7 @@ class DynexConfig:
         self.default_description = default_description
         self.preserve_solutions = preserve_solutions
         self.debug_save_solutions = debug_save_solutions
+        self.grpc_use_tls = grpc_use_tls
 
         # Validate and normalize compute_backend
         if isinstance(compute_backend, ComputeBackend):
@@ -164,6 +167,10 @@ class DynexConfig:
                 raise FileNotFoundError("Solver file not found in testnet mode.")
         else:
             self.solver_path = None
+
+        # tmp_dir: explicit param > ENV > default (./tmp)
+        env_tmp_dir = self._get_config_value(tmp_dir, "TMP_DIR")
+        self.tmp_dir: Optional[str] = env_tmp_dir if env_tmp_dir else None
 
         self._ensure_tmp_directory()
 
@@ -310,20 +317,27 @@ class DynexConfig:
         return None
 
     def _ensure_tmp_directory(self) -> None:
-        """Create tmp/ directory with write permissions."""
-        tmp_dir = os.path.join(os.getcwd(), "tmp")
+        """Create the tmp working directory with write permissions."""
+        resolved = self.tmp_dir if self.tmp_dir else os.path.join(os.getcwd(), "tmp")
         try:
-            os.makedirs(tmp_dir, exist_ok=True)
-            if not os.access(tmp_dir, os.W_OK):
-                raise PermissionError(f"Cannot write to tmp/: {tmp_dir}")
+            os.makedirs(resolved, exist_ok=True)
+            if not os.access(resolved, os.W_OK):
+                raise PermissionError(f"Cannot write to tmp directory: {resolved}")
         except OSError as e:
-            self.logger.error(f"Failed to create tmp/: {e}")
+            self.logger.error(f"Failed to create tmp directory: {e}")
             raise
 
     def as_dict(self) -> dict:
-        """Return all config parameters as a dict."""
+        """Return all config parameters as a dict. sdk_key is masked."""
+        key = self.sdk_key
+        if key and len(key) > 10:
+            masked_key = f"{key[:6]}...{key[-4:]}"
+        elif key:
+            masked_key = "***"
+        else:
+            masked_key = ""
         return {
-            "sdk_key": self.sdk_key,
+            "sdk_key": masked_key,
             "grpc_endpoint": self.grpc_endpoint,
             "mainnet": self.mainnet,
             "solver_path": self.solver_path,
@@ -336,4 +350,6 @@ class DynexConfig:
             "default_description": self.default_description,
             "preserve_solutions": self.preserve_solutions,
             "debug_save_solutions": self.debug_save_solutions,
+            "tmp_dir": self.tmp_dir,
+            "grpc_use_tls": self.grpc_use_tls,
         }
